@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Believer Bingo – Play Along!</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a1a;
+    --cell-bg: #1a1a3e;
+    --cell-hover: #252560;
+    --neon-pink: #ff2d55;
+    --neon-blue: #00d4ff;
+    --neon-green: #39ff14;
+    --neon-yellow: #ffe600;
+    --neon-purple: #bf5fff;
+    --text: #f0f0ff;
+    --text-dim: #8888aa;
+    --gold: #ffd700;
+    --cell-marked-glow: rgba(255, 45, 85, 0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Lexend', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px 16px 40px;
+  }
+
+  .scanline-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none; z-index: 100;
+  }
+  .vignette {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%);
+    pointer-events: none; z-index: 99;
+  }
+
+  .wrapper {
+    width: min(98vw, 460px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    z-index: 10;
+  }
+
+  .title {
+    font-family: 'Bangers', cursive;
+    font-size: clamp(42px, 10vw, 68px);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--neon-pink), var(--neon-blue), var(--neon-purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 0 20px rgba(255,45,85,0.5)) drop-shadow(0 0 40px rgba(0,212,255,0.3));
+    animation: titlePulse 3s ease-in-out infinite;
+    line-height: 1; text-align: center;
+  }
+  @keyframes titlePulse {
+    0%, 100% { filter: drop-shadow(0 0 20px rgba(255,45,85,0.5)) drop-shadow(0 0 40px rgba(0,212,255,0.3)); }
+    50% { filter: drop-shadow(0 0 30px rgba(255,45,85,0.7)) drop-shadow(0 0 60px rgba(0,212,255,0.5)); }
+  }
+
+  .subtitle {
+    font-size: 12px; color: var(--text-dim);
+    letter-spacing: 3px; text-transform: uppercase;
+    text-align: center; line-height: 1.6;
+  }
+
+  .score-bar { display: flex; gap: 24px; align-items: center; justify-content: center; }
+  .score-item { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+  .score-item span {
+    color: var(--neon-blue); font-size: 20px;
+    font-family: 'Bangers', cursive; letter-spacing: 2px;
+  }
+
+  .bingo-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 8px; padding: 14px; width: 100%;
+    background: linear-gradient(135deg, rgba(255,45,85,0.08), rgba(0,212,255,0.08));
+    border: 2px solid rgba(255,45,85,0.3); border-radius: 18px;
+    box-shadow: 0 0 30px rgba(255,45,85,0.12), 0 0 60px rgba(0,212,255,0.08), inset 0 0 30px rgba(0,0,0,0.3);
+  }
+
+  .cell {
+    aspect-ratio: 4 / 3; background: var(--cell-bg);
+    border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 10px 8px;
+    cursor: pointer; transition: all 0.2s ease;
+    position: relative; overflow: hidden;
+    font-size: clamp(11px, 2.4vw, 14px);
+    font-weight: 600; line-height: 1.3;
+    color: var(--text); user-select: none; white-space: pre-line;
+  }
+  .cell::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  }
+  .cell:hover:not(.marked):not(.free-space) {
+    background: var(--cell-hover); border-color: rgba(0,212,255,0.3);
+    transform: scale(1.03); box-shadow: 0 0 15px rgba(0,212,255,0.2);
+  }
+  .cell.marked {
+    background: linear-gradient(135deg, var(--neon-pink), #cc1144);
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 20px var(--cell-marked-glow), 0 0 40px rgba(255,45,85,0.2), inset 0 0 15px rgba(255,255,255,0.1);
+    color: #fff; animation: markPop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .cell.marked::after {
+    content: '✓'; position: absolute; top: 5px; right: 7px; font-size: 14px; opacity: 0.8;
+  }
+  @keyframes markPop { 0%{transform:scale(0.8)} 50%{transform:scale(1.1)} 100%{transform:scale(1)} }
+
+  .free-space {
+    background: linear-gradient(135deg, #2a1a0a, #3d1a00);
+    border-color: rgba(255, 100, 0, 0.4);
+    font-family: 'Bangers', cursive; font-size: clamp(13px,2.6vw,17px);
+    letter-spacing: 2px; color: #ff6600;
+    text-shadow: 0 0 10px rgba(255, 100, 0, 0.5); cursor: pointer;
+  }
+  .free-space:hover:not(.marked) {
+    background: linear-gradient(135deg, #3d1a00, #4d2200);
+    border-color: rgba(255, 100, 0, 0.6);
+    transform: scale(1.03); box-shadow: 0 0 20px rgba(255, 100, 0, 0.3);
+  }
+
+  .cell.win-highlight {
+    animation: winPulse 0.6s ease infinite alternate;
+    box-shadow: 0 0 25px rgba(255,215,0,0.6), 0 0 50px rgba(255,215,0,0.3), inset 0 0 15px rgba(255,215,0,0.2);
+    border-color: var(--gold) !important;
+  }
+  @keyframes winPulse {
+    from { box-shadow: 0 0 25px rgba(255,215,0,0.6), 0 0 50px rgba(255,215,0,0.3); }
+    to { box-shadow: 0 0 35px rgba(255,215,0,0.8), 0 0 70px rgba(255,215,0,0.5); }
+  }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    font-family: 'Lexend', sans-serif; font-weight: 700; font-size: 12px;
+    letter-spacing: 1px; text-transform: uppercase; padding: 9px 18px;
+    border: 2px solid; border-radius: 8px; cursor: pointer;
+    transition: all 0.2s; background: transparent;
+  }
+  .btn-reset { color: var(--neon-pink); border-color: var(--neon-pink); }
+  .btn-reset:hover { background: var(--neon-pink); color: #fff; box-shadow: 0 0 20px var(--cell-marked-glow); }
+  .btn-new { color: var(--neon-green); border-color: var(--neon-green); }
+  .btn-new:hover { background: var(--neon-green); color: #000; box-shadow: 0 0 20px rgba(57,255,20,0.4); }
+  .btn-undo { color: var(--neon-yellow); border-color: var(--neon-yellow); }
+  .btn-undo:hover { background: var(--neon-yellow); color: #000; box-shadow: 0 0 20px rgba(255,230,0,0.5); }
+
+  .hint { color: var(--text-dim); font-size: 11px; text-align: center; line-height: 1.6; }
+
+  .bingo-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: none; align-items: center; justify-content: center;
+    z-index: 200; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  }
+  .bingo-overlay.active { display: flex; animation: overlayIn 0.3s ease; }
+  @keyframes overlayIn { from{opacity:0} to{opacity:1} }
+  .bingo-text {
+    font-family: 'Bangers', cursive; font-size: clamp(80px,20vw,140px); letter-spacing: 12px;
+    background: linear-gradient(135deg, var(--gold), #ffaa00, var(--gold), #fff5cc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: bingoSlam 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+    filter: drop-shadow(0 0 30px rgba(255,215,0,0.8)) drop-shadow(0 0 60px rgba(255,170,0,0.4));
+  }
+  @keyframes bingoSlam { 0%{transform:scale(3);opacity:0} 60%{transform:scale(0.9)} 100%{transform:scale(1);opacity:1} }
+
+  .mark-flash {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle, rgba(255,45,85,0.15), transparent 70%);
+    pointer-events: none; z-index: 50; animation: flashOut 0.5s ease forwards;
+  }
+  @keyframes flashOut { from{opacity:1} to{opacity:0} }
+
+  .channel-link {
+    font-size: 11px; color: var(--text-dim); text-align: center;
+  }
+  .channel-link a { color: var(--neon-blue); text-decoration: none; }
+  .channel-link a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="scanline-overlay"></div>
+<div class="vignette"></div>
+
+<div class="wrapper">
+  <div class="title">Believer Bingo</div>
+  <div class="subtitle">Play along with The Unconvinced<br>Mark off each argument as you hear it!</div>
+
+  <div class="score-bar">
+    <div class="score-item">Marked: <span id="markedCount">0</span> / 12</div>
+    <div class="score-item">Lines: <span id="lineCount">0</span></div>
+  </div>
+
+  <div class="bingo-grid" id="bingoGrid"></div>
+
+  <div class="controls">
+    <button class="btn btn-undo" onclick="undoLast()">↩ Undo</button>
+    <button class="btn btn-reset" onclick="resetBoard()">✕ Clear</button>
+    <button class="btn btn-new" id="newCardBtn" onclick="newCard()">🔀 New Card</button>
+  </div>
+
+  <div class="hint">Tap any square to mark it · <strong style="color:var(--neon-green)">BINGO</strong> when you complete a line!</div>
+
+  <div class="channel-link">
+    Watch live at <a href="https://youtube.com/@theunconvinced" target="_blank">youtube.com/@theunconvinced</a>
+  </div>
+</div>
+
+<div class="bingo-overlay" id="bingoOverlay" onclick="dismissBingo()">
+  <div class="bingo-text">BINGO!</div>
+</div>
+
+<script>
+  const allSquares = [
+    "Look at the trees!",
+    "Read it in context",
+    "You send yourself\nto hell",
+    "Nothing comes\nfrom nothing",
+    "It's a relationship,\nnot a religion",
+    "You just want\nto sin",
+    "No morality\nwithout God",
+    "The Bible is\nhistorically accurate",
+    "You were never\na real Christian",
+    "I'll pray for you",
+    "God works in\nmysterious ways",
+    "Takes more faith\nto be an atheist",
+    "What if\nyou're wrong?",
+    "Fine-tuned\nuniverse",
+    "You can't prove\nGod doesn't exist",
+    "That's the\nOld Testament",
+    "Jesus fulfilled\nprophecy",
+    "Scientists believe\nin God too",
+    "Evolution is\njust a theory",
+    "The empty tomb",
+    "Changed lives\nprove it",
+    "You need faith",
+    "Why something\nrather than nothing?",
+    "The Bible says it,\nI believe it",
+    "Christianity built\ncivilisation",
+    "Atheism leads\nto nihilism",
+    "Irreducible\ncomplexity",
+    "DNA is code,\ncodes need a coder",
+    "The Kalam\nargument",
+    "Absolute truth\nexists",
+    "Laws of logic\nprove God",
+    "You're suppressing\nthe truth",
+    "Everyone knows\nGod exists",
+    "Stalin was\nan atheist",
+    "How do you\naccount for logic?",
+    "The resurrection\nis historical fact",
+    "Personal experience\nof God",
+    "Where do rights\ncome from?",
+    "Without God\nlife is meaningless",
+    "Just have faith",
+  ];
+
+  const TOTAL_CELLS = 12;
+  const FREE_INDEX = 4;
+  const NEEDED = TOTAL_CELLS - 1;
+
+  let currentSquares = [];
+  let markedState = new Array(TOTAL_CELLS).fill(false);
+  let undoStack = [];
+  let detectedLines = new Set();
+
+  const winLines = [
+    [0,1,2],[3,4,5],[6,7,8],[9,10,11],
+    [0,3,6,9],[1,4,7,10],[2,5,8,11],
+    [0,4,8],[2,4,6],[3,7,11],[1,5,9],
+  ];
+
+  function shuffleArray(arr) {
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+    return a;
+  }
+
+  function buildBoard() {
+    const grid = document.getElementById('bingoGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell'; cell.dataset.index = i;
+      if (i === FREE_INDEX) {
+        cell.classList.add('free-space');
+        cell.textContent = '🔥 CRASH OUT 🔥';
+        cell.addEventListener('click', () => toggleCell(i));
+      } else {
+        const sqIdx = i > FREE_INDEX ? i - 1 : i;
+        cell.textContent = currentSquares[sqIdx];
+        cell.addEventListener('click', () => toggleCell(i));
+        if (markedState[i]) cell.classList.add('marked');
+      }
+      grid.appendChild(cell);
+    }
+    // Re-apply win highlights
+    detectedLines.forEach(key => {
+      winLines[parseInt(key)].forEach(i => {
+        const cell = document.querySelector(`.cell[data-index="${i}"]`);
+        if (cell) cell.classList.add('win-highlight');
+      });
+    });
+    updateScore();
+  }
+
+  function toggleCell(index) {
+    if (!markedState[index]) {
+      markedState[index] = true; undoStack.push(index);
+      document.querySelector(`.cell[data-index="${index}"]`).classList.add('marked');
+      flashScreen(); updateScore(); checkBingo();
+    } else {
+      markedState[index] = false; undoStack = undoStack.filter(x=>x!==index);
+      document.querySelector(`.cell[data-index="${index}"]`).classList.remove('marked','win-highlight');
+      updateScore(); recheckLines();
+    }
+  }
+
+  function undoLast() {
+    if (!undoStack.length) return;
+    const last = undoStack.pop(); markedState[last] = false;
+    document.querySelector(`.cell[data-index="${last}"]`).classList.remove('marked','win-highlight');
+    updateScore(); recheckLines();
+  }
+
+  function updateScore() {
+    document.getElementById('markedCount').textContent = markedState.filter(Boolean).length;
+    document.getElementById('lineCount').textContent = detectedLines.size;
+  }
+
+  function checkBingo() {
+    let newBingo = false;
+    winLines.forEach((line,idx) => {
+      const key = idx.toString();
+      if (!detectedLines.has(key) && line.every(i=>markedState[i])) {
+        detectedLines.add(key); newBingo = true;
+        line.forEach(i => document.querySelector(`.cell[data-index="${i}"]`).classList.add('win-highlight'));
+      }
+    });
+    if (newBingo) { showBingoOverlay(); spawnConfetti(); }
+    updateScore();
+  }
+
+  function recheckLines() {
+    detectedLines.clear();
+    document.querySelectorAll('.win-highlight').forEach(el=>el.classList.remove('win-highlight'));
+    winLines.forEach((line,idx) => {
+      if (line.every(i=>markedState[i])) {
+        detectedLines.add(idx.toString());
+        line.forEach(i => document.querySelector(`.cell[data-index="${i}"]`).classList.add('win-highlight'));
+      }
+    });
+    updateScore();
+  }
+
+  function resetBoard() {
+    markedState = new Array(TOTAL_CELLS).fill(false);
+    undoStack=[]; detectedLines = new Set();
+    document.querySelectorAll('.cell').forEach(c=>c.classList.remove('marked','win-highlight'));
+    updateScore();
+  }
+
+  // Init — load squares from URL param if present, otherwise random
+  function newCard() {
+    const params = new URLSearchParams(location.search);
+    const sq = params.get('squares');
+    if (sq) {
+      const indices = sq.split(',').map(Number);
+      currentSquares = indices.map(i => allSquares[i] || '?').slice(0, NEEDED);
+      document.getElementById('newCardBtn').style.display = 'none';
+    } else {
+      currentSquares = shuffleArray([...allSquares]).slice(0, NEEDED);
+    }
+    markedState = new Array(TOTAL_CELLS).fill(false);
+    undoStack=[]; detectedLines = new Set();
+    buildBoard();
+  }
+
+  function flashScreen() {
+    const f = document.createElement('div'); f.className='mark-flash';
+    document.body.appendChild(f); setTimeout(()=>f.remove(),500);
+  }
+
+  function showBingoOverlay() {
+    const o = document.getElementById('bingoOverlay'); o.classList.add('active');
+    setTimeout(()=>o.classList.remove('active'),3500);
+  }
+  function dismissBingo() { document.getElementById('bingoOverlay').classList.remove('active'); }
+
+  function spawnConfetti() {
+    const colors=['#ff2d55','#00d4ff','#39ff14','#ffe600','#bf5fff','#ffd700'];
+    for(let i=0;i<80;i++){
+      const p=document.createElement('div');
+      p.style.cssText=`position:fixed;left:${Math.random()*100}vw;top:-10px;background:${colors[Math.floor(Math.random()*colors.length)]};width:${Math.random()*8+5}px;height:${Math.random()*8+5}px;border-radius:${Math.random()>.5?'50%':'2px'};z-index:201;pointer-events:none;`;
+      const xd=(Math.random()-.5)*200,rot=Math.random()*720,dur=Math.random()*2+2,del=Math.random()*.5;
+      p.animate([
+        {transform:'translateY(0) translateX(0) rotate(0deg)',opacity:1},
+        {transform:`translateY(100vh) translateX(${xd}px) rotate(${rot}deg)`,opacity:0}
+      ],{duration:dur*1000,delay:del*1000,easing:'cubic-bezier(0.25,0.46,0.45,0.94)',fill:'forwards'});
+      document.body.appendChild(p); setTimeout(()=>p.remove(),(dur+del)*1000+100);
+    }
+  }
+
+  // Init — deal a fresh card
+  newCard();
+</script>
+</body>
+</html>
