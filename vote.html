@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inner Circle — The Verdict</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#08080f;--panel:#12122a;
+  --gold:#e8b84b;--gold-dim:rgba(232,184,75,.15);--gold-border:rgba(232,184,75,.35);
+  --red:#ff2d55;--red-dim:rgba(255,45,85,.12);--red-border:rgba(255,45,85,.4);
+  --green:#39ff14;--green-dim:rgba(57,255,20,.1);--green-border:rgba(57,255,20,.35);
+  --text:#f0f0ff;--text-dim:#8888aa;
+}
+body{background:var(--bg);font-family:system-ui,-apple-system,sans-serif;color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:var(--panel);border:1px solid var(--gold-border);border-radius:20px;padding:32px 28px;max-width:380px;width:100%;text-align:center;}
+.crown{font-size:40px;margin-bottom:8px;}
+h1{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
+.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:28px;}
+.caller-bar{min-height:22px;margin-bottom:20px;}
+.caller-name{color:var(--gold);font-size:12px;letter-spacing:1px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px;display:inline-block;}
+.select-wrap{margin-bottom:24px;text-align:left;}
+label{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text-dim);display:block;margin-bottom:8px;}
+select{width:100%;background:#0d0d22;border:1px solid var(--gold-border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;}
+select:focus{border-color:var(--gold);}
+.btn-vote{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;border:2px solid;transition:all .2s;margin-bottom:10px;font-family:inherit;}
+.btn-vote.kick{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+.btn-vote.kick:hover:not(:disabled){background:var(--red);color:#fff;}
+.btn-vote.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;}
+.btn-vote.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
+.btn-vote:disabled{opacity:.35;cursor:not-allowed;}
+.status-box{margin-top:20px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
+.status-box.voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
+.status-box.withdrawn{background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);display:block;}
+.status-box.fired{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);display:block;}
+.hint{font-size:11px;color:var(--text-dim);margin-top:14px;line-height:1.6;}
+.loading{color:var(--text-dim);font-size:13px;padding:20px 0;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="crown">⚖️</div>
+  <h1>THE VERDICT</h1>
+  <div class="subtitle">INNER CIRCLE · EXCLUSIVE</div>
+
+  <div class="caller-bar" id="callerBar"></div>
+
+  <div class="loading" id="loadingMsg">Connecting...</div>
+
+  <div id="mainUI" style="display:none">
+    <div class="select-wrap">
+      <label>YOUR NAME</label>
+      <select id="memberSelect">
+        <option value="">— Select your name —</option>
+        <option>Ammon Ra</option>
+        <option>Flibberty Giblets</option>
+        <option>How To Push Back</option>
+        <option>Tim Cooney</option>
+        <option>Gordon Loves Science</option>
+        <option>Drew Smith</option>
+      </select>
+    </div>
+
+    <button class="btn-vote kick" id="btnVote" onclick="castVote()">🚨 CAST VERDICT</button>
+    <button class="btn-vote withdraw" id="btnWithdraw" onclick="withdrawVote()" style="display:none">↩ Withdraw vote</button>
+    <div class="status-box" id="statusBox"></div>
+    <p class="hint" id="hintText">Your vote is anonymous until the verdict fires.</p>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const voteDoc = doc(db, "vote", "current");
+
+let myVote = false;
+let currentState = {};
+let memberName = localStorage.getItem("ic_member") || "";
+
+// ── Restore saved name ──
+const sel = document.getElementById("memberSelect");
+if (memberName) sel.value = memberName;
+sel.addEventListener("change", () => {
+  memberName = sel.value;
+  if (memberName) localStorage.setItem("ic_member", memberName);
+});
+
+// ── Listen to Firestore ──
+onSnapshot(voteDoc, snap => {
+  document.getElementById("loadingMsg").style.display = "none";
+  document.getElementById("mainUI").style.display = "block";
+
+  if (!snap.exists()) {
+    currentState = { votes: {}, threshold: 2, fired: false, caller: null };
+  } else {
+    currentState = snap.data();
+  }
+
+  // Caller bar
+  const callerBar = document.getElementById("callerBar");
+  if (currentState.caller) {
+    callerBar.innerHTML = `<span class="caller-name">📞 ${esc(currentState.caller)}</span>`;
+  } else {
+    callerBar.innerHTML = "";
+  }
+
+  // Hint with threshold
+  document.getElementById("hintText").textContent =
+    `Threshold: ${currentState.threshold} votes. Your vote is anonymous until the verdict fires.`;
+
+  // Reflect my vote state from Firestore (survives refresh)
+  const votes = currentState.votes || {};
+  myVote = !!(memberName && votes[memberName]);
+
+  if (currentState.fired) {
+    showFired();
+  } else {
+    renderVoteState();
+  }
+});
+
+// ── Actions ──
+async function castVote() {
+  memberName = sel.value;
+  if (!memberName) { alert("Please select your name first."); return; }
+  localStorage.setItem("ic_member", memberName);
+
+  const snap = await getDoc(voteDoc);
+  const data = snap.exists() ? snap.data() : { votes: {}, threshold: 2, fired: false };
+  const votes = data.votes || {};
+  votes[memberName] = true;
+
+  // Check if this triggers the verdict
+  const activeVoters = Object.keys(votes).filter(k => votes[k]);
+  const fired = activeVoters.length >= (data.threshold || 2);
+
+  await setDoc(voteDoc, {
+    ...data,
+    votes,
+    fired,
+    voters: fired ? activeVoters : (data.voters || [])
+  }, { merge: true });
+
+  myVote = true;
+}
+
+async function withdrawVote() {
+  memberName = sel.value;
+  if (!memberName) return;
+
+  const snap = await getDoc(voteDoc);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const votes = { ...(data.votes || {}) };
+  delete votes[memberName];
+
+  await setDoc(voteDoc, { ...data, votes }, { merge: true });
+  myVote = false;
+}
+
+// ── UI helpers ──
+function renderVoteState() {
+  const btnVote = document.getElementById("btnVote");
+  const btnWith = document.getElementById("btnWithdraw");
+  const box     = document.getElementById("statusBox");
+
+  if (myVote) {
+    box.className = "status-box voted";
+    box.textContent = "✊ Vote cast. Waiting for others...";
+    btnVote.disabled = true;
+    btnWith.style.display = "block";
+  } else {
+    box.className = "status-box";
+    box.style.display = "none";
+    btnVote.disabled = false;
+    btnWith.style.display = "none";
+  }
+}
+
+function showFired() {
+  const voters = currentState.voters || [];
+  const box = document.getElementById("statusBox");
+  box.className = "status-box fired";
+  box.innerHTML = "⚡ VERDICT REACHED<br><small>" + voters.map(esc).join(", ") + "</small>";
+  document.getElementById("btnVote").disabled = true;
+  document.getElementById("btnWithdraw").style.display = "none";
+}
+
+function esc(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// Expose to onclick handlers
+window.castVote    = castVote;
+window.withdrawVote = withdrawVote;
+</script>
+</body>
+</html>
