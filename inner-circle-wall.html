@@ -2,353 +2,92 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Inner Circle — The Unconvinced</title>
+<title>Inner Circle Wall — Controller</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
 :root {
-  --accent: #E8B84B;
-  --accent-dim: rgba(232,184,75,0.18);
-  --accent-border: rgba(232,184,75,0.45);
-  --bg: rgba(22, 17, 8, 0.88);
-  --text: #F2F2F2;
-  --text-dim: rgba(242,242,242,0.5);
+  --accent: #E8B84B; --accent-dim: rgba(232,184,75,0.18); --accent-border: rgba(232,184,75,0.45);
+  --bg: #0f0e0a; --panel: #1a1810; --text: #F2F2F2; --text-dim: rgba(242,242,242,0.5);
+  --border: rgba(255,255,255,0.08); --green: #39ff14; --red: #ff2d55;
 }
-
-body {
-  background: transparent;
-  font-family: 'DM Sans', sans-serif;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  position: relative;
-}
-
-/* ═══════════════════════════════
-   SETUP PANEL
-═══════════════════════════════ */
-#setup-panel {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 520px;
-  background: #141418;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 36px 40px;
-  z-index: 100;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-}
-
-#setup-panel h1 {
-  font-size: 20px; font-weight: 700;
-  color: var(--text); margin-bottom: 4px;
-  letter-spacing: -0.3px;
-}
-
-.setup-sub {
-  font-size: 13px; color: var(--text-dim);
-  margin-bottom: 28px;
-}
-
-.field-label {
-  font-size: 11px; font-weight: 600;
-  color: var(--text-dim);
-  text-transform: uppercase; letter-spacing: 0.7px;
-  display: block; margin-bottom: 7px;
-}
-
-.tab-row {
-  display: flex; gap: 3px;
-  background: rgba(255,255,255,0.04);
-  border-radius: 8px; padding: 3px;
-  margin-bottom: 20px;
-}
-
-.tab-btn {
-  flex: 1; font-family: 'DM Sans', sans-serif;
-  font-size: 13px; font-weight: 500;
-  color: var(--text-dim);
-  background: transparent; border: none;
-  border-radius: 6px; padding: 9px;
-  cursor: pointer; transition: all 0.15s;
-}
-.tab-btn.active {
-  background: rgba(255,255,255,0.08);
-  color: var(--text);
-}
-
-.tab-pane { display: none; }
-.tab-pane.active { display: block; }
-
-/* CSV drop zone */
-.drop-zone {
-  border: 1.5px dashed rgba(255,255,255,0.15);
-  border-radius: 10px; padding: 28px 20px;
-  text-align: center; cursor: pointer;
-  transition: all 0.2s; margin-bottom: 14px;
-  background: rgba(255,255,255,0.02);
-}
-.drop-zone:hover, .drop-zone.drag-over {
-  border-color: var(--accent);
-  background: var(--accent-dim);
-}
-.drop-zone-icon { font-size: 26px; margin-bottom: 8px; }
-.drop-zone p { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
-.drop-zone p strong { color: var(--text); }
-#csv-input { display: none; }
-
-/* Manual textarea */
-textarea {
-  width: 100%; height: 110px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px; padding: 12px 14px;
-  color: var(--text); font-family: 'DM Sans', sans-serif;
-  font-size: 13px; resize: none; outline: none;
-  line-height: 1.6; margin-bottom: 14px;
-}
-textarea::placeholder { color: var(--text-dim); }
-
-#name-preview {
-  font-size: 12px; color: var(--accent);
-  margin-bottom: 20px; min-height: 18px;
-}
-
-.go-btn {
-  width: 100%; padding: 13px;
-  background: var(--accent);
-  border: none; border-radius: 9px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px; font-weight: 700;
-  color: #1a1200; cursor: pointer;
-  transition: opacity 0.15s;
-}
-.go-btn:hover { opacity: 0.88; }
-.go-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.hint {
-  font-size: 11.5px; color: var(--text-dim);
-  text-align: center; margin-top: 14px; line-height: 1.6;
-}
-
-/* ═══════════════════════════════
-   LIVE OVERLAY
-═══════════════════════════════ */
-#overlay-container {
-  display: none;
-  position: absolute;
-  inset: 0;
-}
-
-/* The wall card — centred, wide */
-#wall-card {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -44%) translateY(30px);
-  width: 980px;
-  padding: 40px 44px 36px;
-  background: var(--bg);
-  backdrop-filter: blur(18px) saturate(1.4);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  border: 1px solid var(--accent-border);
-  border-radius: 18px;
-  padding: 32px 36px 28px;
-  opacity: 0;
-  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22,1,0.36,1);
-  pointer-events: none;
-}
-
-#wall-card.visible {
-  opacity: 1;
-  transform: translate(-50%, -44%) translateY(0);
-}
-
-#wall-card.hiding {
-  opacity: 0;
-  transform: translate(-50%, -44%) translateY(20px);
-}
-
-#hotkey-hint {
-  position: absolute;
-  bottom: 18px; right: 24px;
-  font-size: 12px; color: rgba(255,255,255,0.35);
-  z-index: 10;
-}
-#hotkey-hint span {
-  display: inline-block;
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.6);
-  margin-right: 1px;
-}
-
-/* Top accent bar */
-.card-accent-bar {
-  position: absolute;
-  top: 0; left: 36px; right: 36px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  border-radius: 0 0 3px 3px;
-}
-
-/* Header */
-.card-header {
-  display: flex; align-items: center;
-  gap: 10px; margin-bottom: 24px;
-}
-
-.card-star { font-size: 20px; }
-
-.card-title {
-  font-size: 18px; font-weight: 700;
-  color: var(--accent);
-  text-transform: uppercase; letter-spacing: 1.2px;
-  flex: 1;
-}
-
-.batch-badge {
-  font-size: 15px; font-weight: 600;
-  color: var(--text-dim);
-  background: rgba(255,255,255,0.06);
-  border-radius: 20px; padding: 3px 10px;
-  display: none;
-}
-
-/* Two-column name grid */
-#names-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 28px;
-  row-gap: 0;
-  margin-bottom: 22px;
-}
-
-.name-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  opacity: 0;
-  transform: translateX(-8px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.name-item:nth-child(even) {
-  transform: translateX(8px);
-}
-.name-item.revealed {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.name-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-.name-text {
-  font-size: 46px; font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Footer */
-.card-footer {
-  display: flex; align-items: center;
-  justify-content: space-between;
-  padding-top: 16px;
-  border-top: 1px solid rgba(232,184,75,0.12);
-}
-
-.card-cta {
-  font-size: 16px; color: var(--text-dim);
-  letter-spacing: 0.2px;
-}
-
-/* Progress bar */
-#timer-bar-wrap {
-  position: absolute;
-  bottom: 0; left: 36px; right: 36px;
-  height: 2px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 0 0 2px 2px;
-  overflow: hidden;
-}
-#timer-bar {
-  height: 100%; width: 0%;
-  background: var(--accent);
-  border-radius: 2px;
-}
+body { background:var(--bg); font-family:'DM Sans',sans-serif; color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+.card { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:36px 40px; width:520px; }
+h1 { font-size:20px; font-weight:700; color:var(--accent); margin-bottom:4px; }
+.sub { font-size:13px; color:var(--text-dim); margin-bottom:28px; }
+.field-label { font-size:11px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.7px; display:block; margin-bottom:7px; }
+.tab-row { display:flex; gap:3px; background:rgba(255,255,255,0.04); border-radius:8px; padding:3px; margin-bottom:20px; }
+.tab-btn { flex:1; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; color:var(--text-dim); background:transparent; border:none; border-radius:6px; padding:9px; cursor:pointer; transition:all 0.15s; }
+.tab-btn.active { background:rgba(255,255,255,0.08); color:var(--text); }
+.tab-pane { display:none; } .tab-pane.active { display:block; }
+.drop-zone { border:1.5px dashed rgba(255,255,255,0.15); border-radius:10px; padding:28px 20px; text-align:center; cursor:pointer; transition:all 0.2s; margin-bottom:14px; background:rgba(255,255,255,0.02); }
+.drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent); background:var(--accent-dim); }
+.drop-zone-icon { font-size:26px; margin-bottom:8px; }
+.drop-zone p { font-size:13px; color:var(--text-dim); line-height:1.5; }
+.drop-zone p strong { color:var(--text); }
+#csv-input { display:none; }
+textarea { width:100%; height:110px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; resize:none; outline:none; line-height:1.6; margin-bottom:14px; }
+textarea::placeholder { color:var(--text-dim); }
+#name-preview { font-size:12px; color:var(--accent); margin-bottom:20px; min-height:18px; }
+.status-row { display:flex; align-items:center; gap:10px; margin-bottom:20px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:8px; font-size:13px; }
+.status-dot { width:9px; height:9px; border-radius:50%; background:var(--text-dim); flex-shrink:0; transition:background .3s; }
+.status-dot.live { background:var(--green); box-shadow:0 0 8px var(--green); }
+.status-dot.hidden { background:var(--red); }
+#status-text { color:var(--text-dim); flex:1; }
+.btn-row { display:flex; gap:8px; }
+.go-btn { flex:1; padding:13px; background:var(--accent); border:none; border-radius:9px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; color:#1a1200; cursor:pointer; transition:opacity 0.15s; }
+.go-btn:hover { opacity:0.88; } .go-btn:disabled { opacity:0.35; cursor:not-allowed; }
+.ctrl-btn { padding:13px 18px; background:transparent; border:1px solid var(--border); border-radius:9px; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600; color:var(--text-dim); cursor:pointer; transition:all 0.15s; }
+.ctrl-btn:hover { border-color:var(--accent); color:var(--accent); }
+.ctrl-btn:disabled { opacity:0.35; cursor:not-allowed; }
+.hint { font-size:11.5px; color:var(--text-dim); text-align:center; margin-top:14px; line-height:1.6; }
+.sync-note { font-size:11px; color:var(--accent); margin-top:10px; min-height:16px; text-align:center; }
 </style>
 </head>
 <body>
-
-<!-- SETUP PANEL -->
-<div id="setup-panel">
+<div class="card">
   <h1>⭐ Inner Circle Wall</h1>
-  <p class="setup-sub">Load your members, then press <strong>S</strong> to show/hide on stream.</p>
+  <p class="sub">Load members, then control the OBS overlay from here.</p>
+
+  <div class="status-row">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="status-text">Not started</span>
+    <span id="batch-info" style="font-size:12px;color:var(--text-dim);margin-left:auto;"></span>
+  </div>
 
   <div class="tab-row">
     <button class="tab-btn active" onclick="switchTab('csv')">Upload CSV</button>
     <button class="tab-btn" onclick="switchTab('manual')">Enter manually</button>
   </div>
 
-  <!-- CSV tab -->
   <div class="tab-pane active" id="tab-csv">
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
       <div class="drop-zone-icon">📄</div>
-      <p><strong>Click to upload</strong> or drag &amp; drop your CSV<br>
-      YouTube Studio export or any CSV with names</p>
+      <p><strong>Click to upload</strong> or drag &amp; drop your CSV<br>YouTube Studio export or any CSV with names</p>
     </div>
     <input type="file" id="csv-input" accept=".csv,.txt">
   </div>
 
-  <!-- Manual tab -->
   <div class="tab-pane" id="tab-manual">
-    <textarea id="manual-names" placeholder="One name per line&#10;Jon Cohen&#10;Sean&#10;..."></textarea>
+    <span class="field-label">One name per line</span>
+    <textarea id="manual-names" placeholder="Jon Cohen&#10;Ammon Ra&#10;Flibberty Giblets"></textarea>
   </div>
 
   <div id="name-preview"></div>
 
-  <button class="go-btn" id="go-btn" onclick="goLive()" disabled>Go Live</button>
-  <p class="hint">
-    <strong>S</strong> — show / hide &nbsp;·&nbsp; <strong>N</strong> — next batch &nbsp;·&nbsp; <strong>E</strong> — back to setup
-  </p>
-</div>
+  <div class="btn-row">
+    <button class="go-btn" id="go-btn" onclick="goLive()" disabled>Go Live</button>
+    <button class="ctrl-btn" id="toggle-btn" onclick="toggleVisibility()" disabled>Show / Hide</button>
+    <button class="ctrl-btn" id="next-btn" onclick="nextBatch()" disabled>Next →</button>
+  </div>
 
-<!-- LIVE OVERLAY -->
-<div id="overlay-container">
-  <div id="hotkey-hint">
-    <span>S</span> show/hide &nbsp;·&nbsp; <span>N</span> next batch &nbsp;·&nbsp; <span>E</span> edit
-  </div>
-  <div id="wall-card">
-    <div class="card-accent-bar"></div>
-    <div class="card-header">
-      <span class="card-star">⭐</span>
-      <span class="card-title">Inner Circle Members</span>
-      <span class="batch-badge" id="batch-badge"></span>
-    </div>
-    <div id="names-grid"></div>
-    <div class="card-footer">
-      <span class="card-cta">Thank you for supporting The Unconvinced</span>
-    </div>
-    <div id="timer-bar-wrap">
-      <div id="timer-bar"></div>
-    </div>
-  </div>
+  <p class="hint">Load names → <strong>Go Live</strong> to push to OBS → <strong>Show/Hide</strong> to toggle.<br>Keyboard: <strong>S</strong> = show/hide &nbsp;·&nbsp; <strong>N</strong> = next batch</p>
+  <div class="sync-note" id="syncNote"></div>
 </div>
 
 <script type="module">
-// ── Firebase sync ─────────────────────────────────────────────────────────────
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc }
+import { getFirestore, doc, setDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -359,266 +98,121 @@ const firebaseConfig = {
   messagingSenderId: "1054324566020",
   appId: "1:1054324566020:web:dc6739c69458011efe2d51"
 };
-const fbApp = initializeApp(firebaseConfig, "icwall");
-const db = getFirestore(fbApp);
+
+const app        = initializeApp(firebaseConfig);
+const db         = getFirestore(app);
+const wallRef    = doc(db, "innerCircleWall", "state");
 const membersRef = doc(db, "config", "innerCircle");
 
-async function syncMembersToFirestore(names) {
-  if (!names || names.length === 0) return;
-  try {
-    await setDoc(membersRef, { members: names }, { merge: true });
-    showSyncStatus(`☠️ Kill Switch updated — ${names.length} members saved`);
-  } catch(e) {
-    showSyncStatus('⚠️ Firestore sync failed', true);
-    console.error(e);
-  }
-}
-
-function showSyncStatus(msg, isError) {
-  let el = document.getElementById('sync-status');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'sync-status';
-    el.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:999;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:1px;pointer-events:none;transition:opacity .4s;';
-    document.body.appendChild(el);
-  }
-  el.style.background = isError ? 'rgba(255,45,85,.15)' : 'rgba(232,184,75,.15)';
-  el.style.border = isError ? '1px solid #ff2d55' : '1px solid #e8b84b';
-  el.style.color = isError ? '#ff2d55' : '#e8b84b';
-  el.style.opacity = '1';
-  el.textContent = msg;
-  setTimeout(() => { el.style.opacity = '0'; }, 3000);
-}
-
-// Expose for use in non-module functions
-window._syncMembersToFirestore = syncMembersToFirestore;
-// ──────────────────────────────────────────────────────────────────────────────
-</script>
-
-<script>
 const BATCH_SIZE = 16;
-const AUTO_ADVANCE_MS = 12000; // auto-advance to next batch after 12s if multiple batches
+let allNames = [], currentBatch = 0, totalBatches = 0, isVisible = false, isLive = false;
 
-let allNames = [];
-let currentBatch = 0;
-let totalBatches = 0;
-let isLive = false;
-let isVisible = false;
-let autoAdvanceTimer = null;
-let timerAnimFrame = null;
+// Reflect live Firestore state
+onSnapshot(wallRef, snap => {
+  if (!snap.exists()) return;
+  const data = snap.data();
+  isVisible    = data.visible || false;
+  currentBatch = data.batch   || 0;
+  updateStatusUI();
+});
 
-// ── TAB SWITCHING ──
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', (i === 0 && tab === 'csv') || (i === 1 && tab === 'manual'));
+window.switchTab = function(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => {
+    b.classList.toggle("active", (i===0&&tab==="csv")||(i===1&&tab==="manual"));
   });
-  document.getElementById('tab-csv').classList.toggle('active', tab === 'csv');
-  document.getElementById('tab-manual').classList.toggle('active', tab === 'manual');
+  document.getElementById("tab-csv").classList.toggle("active", tab==="csv");
+  document.getElementById("tab-manual").classList.toggle("active", tab==="manual");
   updatePreview();
-}
+};
 
-// ── CSV HANDLING ──
-const dropZone = document.getElementById('drop-zone');
-const csvInput = document.getElementById('csv-input');
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) readCSV(file);
-});
-csvInput.addEventListener('change', () => {
-  if (csvInput.files[0]) readCSV(csvInput.files[0]);
-});
+const dropZone = document.getElementById("drop-zone");
+const csvInput = document.getElementById("csv-input");
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => { e.preventDefault(); dropZone.classList.remove("drag-over"); if (e.dataTransfer.files[0]) readCSV(e.dataTransfer.files[0]); });
+csvInput.addEventListener("change", () => { if (csvInput.files[0]) readCSV(csvInput.files[0]); });
 
 function readCSV(file) {
   const reader = new FileReader();
   reader.onload = e => {
-    const text = e.target.result;
-    const names = parseCSV(text);
+    const names = parseCSV(e.target.result);
     allNames = names;
-    dropZone.querySelector('p').innerHTML = `<strong>${file.name}</strong><br><span style="color:var(--accent)">${names.length} members loaded</span>`;
+    dropZone.querySelector("p").innerHTML = `<strong>${file.name}</strong><br><span style="color:var(--accent)">${names.length} members loaded</span>`;
     updatePreview();
-    // Sync to Firestore so Kill Switch stays up to date
-    if (window._syncMembersToFirestore) window._syncMembersToFirestore(names);
   };
   reader.readAsText(file);
 }
 
 function parseCSV(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  // If it looks like a YouTube Studio export (has header row), try to find name column
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
   const header = lines[0].toLowerCase();
-  const isYTExport = header.includes('member') || header.includes('name') || header.includes('level');
-
+  const isYT = header.includes("member")||header.includes("name")||header.includes("level");
   const names = [];
-  const startRow = isYTExport ? 1 : 0;
-
-  for (let i = startRow; i < lines.length; i++) {
-    const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
-    // Take the first non-empty column that looks like a name
-    const name = cols[0];
-    if (name && name.length > 0 && name.length < 60) names.push(name);
+  for (let i = isYT?1:0; i<lines.length; i++) {
+    const cols = lines[i].split(",").map(c=>c.replace(/^"|"$/g,"").trim());
+    if (cols[0]&&cols[0].length<60) names.push(cols[0]);
   }
   return names;
 }
 
-// ── MANUAL ENTRY ──
-document.getElementById('manual-names').addEventListener('input', updatePreview);
+document.getElementById("manual-names").addEventListener("input", () => {
+  allNames = document.getElementById("manual-names").value.split("\n").map(l=>l.trim()).filter(Boolean);
+  updatePreview();
+});
 
 function updatePreview() {
-  const tab = document.getElementById('tab-csv').classList.contains('active') ? 'csv' : 'manual';
-  if (tab === 'manual') {
-    const lines = document.getElementById('manual-names').value
-      .split('\n').map(l => l.trim()).filter(Boolean);
-    allNames = lines;
-  }
-  const preview = document.getElementById('name-preview');
-  const btn = document.getElementById('go-btn');
-  if (allNames.length > 0) {
-    preview.textContent = `${allNames.length} member${allNames.length !== 1 ? 's' : ''} loaded · ${Math.ceil(allNames.length / BATCH_SIZE)} batch${Math.ceil(allNames.length / BATCH_SIZE) !== 1 ? 'es' : ''} of ${BATCH_SIZE}`;
-    btn.disabled = false;
-  } else {
-    preview.textContent = '';
-    btn.disabled = true;
-  }
-}
-
-// ── GO LIVE ──
-function goLive() {
-  if (allNames.length === 0) return;
-  // Sync current names to Firestore before going live
-  if (window._syncMembersToFirestore) window._syncMembersToFirestore(allNames);
   totalBatches = Math.ceil(allNames.length / BATCH_SIZE);
-  currentBatch = 0;
-  document.getElementById('setup-panel').style.display = 'none';
-  document.getElementById('overlay-container').style.display = 'block';
-  isLive = true;
-  isVisible = false;
-  setTimeout(() => showCard(), 100);
-}
-
-// ── SHOW / HIDE ──
-function showCard() {
-  renderBatch(currentBatch);
-  const card = document.getElementById('wall-card');
-  card.classList.remove('hiding');
-  void card.offsetWidth;
-  card.classList.add('visible');
-  isVisible = true;
-
-  // Stagger name reveal
-  const items = card.querySelectorAll('.name-item');
-  items.forEach((el, i) => {
-    el.classList.remove('revealed');
-    setTimeout(() => el.classList.add('revealed'), 60 + i * 40);
-  });
-
-  // Auto-advance if multiple batches
-  if (totalBatches > 1) {
-    startAutoAdvance();
-  }
-}
-
-function hideCard() {
-  const card = document.getElementById('wall-card');
-  card.classList.remove('visible');
-  card.classList.add('hiding');
-  isVisible = false;
-  stopAutoAdvance();
-  resetTimerBar();
-}
-
-function toggleCard() {
-  if (isVisible) hideCard();
-  else showCard();
-}
-
-// ── BATCH RENDERING ──
-function renderBatch(batchIndex) {
-  const start = batchIndex * BATCH_SIZE;
-  const batch = allNames.slice(start, start + BATCH_SIZE);
-  const grid = document.getElementById('names-grid');
-
-  grid.innerHTML = batch.map(name => `
-    <div class="name-item">
-      <span class="name-dot"></span>
-      <span class="name-text">${name}</span>
-    </div>
-  `).join('');
-
-  // Badge
-  const badge = document.getElementById('batch-badge');
-  if (totalBatches > 1) {
-    badge.style.display = 'block';
-    badge.textContent = `${batchIndex + 1} / ${totalBatches}`;
+  const preview = document.getElementById("name-preview");
+  const goBtn   = document.getElementById("go-btn");
+  if (allNames.length) {
+    preview.textContent = `${allNames.length} member${allNames.length!==1?"s":""} loaded · ${totalBatches} batch${totalBatches!==1?"es":""} of ${BATCH_SIZE}`;
+    goBtn.disabled = false;
   } else {
-    badge.style.display = 'none';
+    preview.textContent = ""; goBtn.disabled = true;
   }
 }
 
-function nextBatch() {
-  if (!isVisible) return;
-  stopAutoAdvance();
-  resetTimerBar();
+window.goLive = async function() {
+  if (!allNames.length) return;
+  totalBatches = Math.ceil(allNames.length / BATCH_SIZE);
+  currentBatch = 0; isLive = true;
+  await setDoc(wallRef, { names: allNames, visible: false, batch: 0 });
+  await setDoc(membersRef, { members: allNames }, { merge: true });
+  document.getElementById("toggle-btn").disabled = false;
+  document.getElementById("next-btn").disabled = totalBatches <= 1;
+  setSyncNote(`✓ Pushed to OBS · ${allNames.length} members · ${totalBatches} batch${totalBatches!==1?"es":""}`);
+};
 
-  // Fade names out
-  document.querySelectorAll('.name-item').forEach(el => el.classList.remove('revealed'));
+window.toggleVisibility = async function() {
+  isVisible = !isVisible;
+  await setDoc(wallRef, { visible: isVisible }, { merge: true });
+};
 
-  setTimeout(() => {
-    currentBatch = (currentBatch + 1) % totalBatches;
-    renderBatch(currentBatch);
-    const items = document.querySelectorAll('.name-item');
-    items.forEach((el, i) => {
-      setTimeout(() => el.classList.add('revealed'), 60 + i * 40);
-    });
-    if (totalBatches > 1) startAutoAdvance();
-  }, 300);
+window.nextBatch = async function() {
+  currentBatch = (currentBatch + 1) % totalBatches;
+  await setDoc(wallRef, { batch: currentBatch }, { merge: true });
+};
+
+function updateStatusUI() {
+  const dot  = document.getElementById("statusDot");
+  const text = document.getElementById("status-text");
+  const info = document.getElementById("batch-info");
+  if (!isLive) { dot.className="status-dot"; text.textContent="Not started"; info.textContent=""; return; }
+  dot.className = isVisible ? "status-dot live" : "status-dot hidden";
+  text.textContent = isVisible ? "Overlay VISIBLE in OBS" : "Overlay hidden";
+  info.textContent = totalBatches>1 ? `Batch ${currentBatch+1} / ${totalBatches}` : "";
 }
 
-// ── AUTO ADVANCE TIMER ──
-function startAutoAdvance() {
-  stopAutoAdvance();
-  if (totalBatches <= 1) return;
-
-  const bar = document.getElementById('timer-bar');
-  bar.style.transition = 'none';
-  bar.style.width = '0%';
-  void bar.offsetWidth;
-  bar.style.transition = `width ${AUTO_ADVANCE_MS}ms linear`;
-  bar.style.width = '100%';
-
-  autoAdvanceTimer = setTimeout(() => nextBatch(), AUTO_ADVANCE_MS);
+function setSyncNote(msg) {
+  const el = document.getElementById("syncNote");
+  el.textContent = msg;
+  setTimeout(() => { el.textContent = ""; }, 4000);
 }
 
-function stopAutoAdvance() {
-  if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
-}
-
-function resetTimerBar() {
-  const bar = document.getElementById('timer-bar');
-  bar.style.transition = 'none';
-  bar.style.width = '0%';
-}
-
-// ── BACK TO SETUP ──
-function backToEdit() {
-  hideCard();
-  document.getElementById('setup-panel').style.display = 'block';
-  document.getElementById('overlay-container').style.display = 'none';
-  isLive = false;
-}
-
-// ── KEYBOARD ──
-document.addEventListener('keydown', e => {
+document.addEventListener("keydown", e => {
   if (!isLive) return;
-  switch(e.key) {
-    case 's': case 'S': e.preventDefault(); toggleCard(); break;
-    case 'n': case 'N': e.preventDefault(); nextBatch(); break;
-    case 'e': case 'E': e.preventDefault(); backToEdit(); break;
-  }
+  if (e.key==="s"||e.key==="S") { e.preventDefault(); window.toggleVisibility(); }
+  if (e.key==="n"||e.key==="N") { e.preventDefault(); window.nextBatch(); }
 });
 </script>
 </body>
