@@ -52,13 +52,7 @@ select:focus{border-color:var(--gold);}
     <div class="select-wrap">
       <label>YOUR NAME</label>
       <select id="memberSelect">
-        <option value="">— Select your name —</option>
-        <option>Ammon Ra</option>
-        <option>Flibberty Giblets</option>
-        <option>How To Push Back</option>
-        <option>Tim Cooney</option>
-        <option>Gordon Loves Science</option>
-        <option>Drew Smith</option>
+        <option value="">Loading members...</option>
       </select>
     </div>
 
@@ -85,7 +79,33 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-const voteDoc = doc(db, "vote", "current");
+const voteDoc    = doc(db, "vote", "current");
+const membersRef = doc(db, "config", "innerCircle");
+
+// ── Load member list dynamically ──
+async function loadMembers() {
+  try {
+    const snap = await getDoc(membersRef);
+    const members = snap.exists() ? (snap.data().members || []) : [];
+    const sel = document.getElementById("memberSelect");
+    sel.innerHTML = '<option value="">— Select your name —</option>';
+    members.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    // Restore saved selection
+    const saved = localStorage.getItem("ic_member");
+    if (saved && members.includes(saved)) sel.value = saved;
+    if (!members.length) {
+      sel.innerHTML = '<option value="">No members loaded yet</option>';
+    }
+  } catch(e) {
+    console.error("Failed to load members", e);
+  }
+}
+loadMembers();
 
 let myVote = false;
 let currentState = {};
