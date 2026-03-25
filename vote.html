@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inner Circle — The Verdict</title>
+<title>Inner Circle — The Kill Switch</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -40,9 +40,9 @@ select:focus{border-color:var(--gold);}
 </head>
 <body>
 <div class="card">
-  <div class="crown">⚖️</div>
-  <h1>THE VERDICT</h1>
-  <div class="subtitle">INNER CIRCLE · EXCLUSIVE</div>
+  <div class="crown">☠️</div>
+  <h1>THE KILL SWITCH</h1>
+  <div class="subtitle">INNER CIRCLE · EYES ONLY</div>
 
   <div class="caller-bar" id="callerBar"></div>
 
@@ -62,10 +62,10 @@ select:focus{border-color:var(--gold);}
       </select>
     </div>
 
-    <button class="btn-vote kick" id="btnVote" onclick="castVote()">🚨 CAST VERDICT</button>
+    <button class="btn-vote kick" id="btnVote" onclick="castVote()">🔴 ACTIVATE KILL SWITCH</button>
     <button class="btn-vote withdraw" id="btnWithdraw" onclick="withdrawVote()" style="display:none">↩ Withdraw vote</button>
     <div class="status-box" id="statusBox"></div>
-    <p class="hint" id="hintText">Your vote is anonymous until the verdict fires.</p>
+    <p class="hint" id="hintText">Your vote is anonymous until the Kill Switch fires.</p>
   </div>
 </div>
 
@@ -195,7 +195,7 @@ function showFired() {
   const voters = currentState.voters || [];
   const box = document.getElementById("statusBox");
   box.className = "status-box fired";
-  box.innerHTML = "⚡ VERDICT REACHED<br><small>" + voters.map(esc).join(", ") + "</small>";
+  box.innerHTML = "☠️ KILL SWITCH ACTIVATED<br><small>" + voters.map(esc).join(", ") + "</small>";
   document.getElementById("btnVote").disabled = true;
   document.getElementById("btnWithdraw").style.display = "none";
 }
