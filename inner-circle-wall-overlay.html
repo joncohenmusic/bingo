@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Inner Circle Wall — Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --accent: #E8B84B;
+  --accent-dim: rgba(232,184,75,0.18);
+  --accent-border: rgba(232,184,75,0.45);
+  --bg: rgba(22, 17, 8, 0.88);
+  --text: #F2F2F2;
+  --text-dim: rgba(242,242,242,0.5);
+}
+
+body {
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  position: relative;
+}
+
+#wall-card {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -44%) translateY(30px);
+  width: 980px;
+  background: var(--bg);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--accent-border);
+  border-radius: 18px;
+  padding: 32px 36px 28px;
+  opacity: 0;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22,1,0.36,1);
+  pointer-events: none;
+}
+
+#wall-card.visible {
+  opacity: 1;
+  transform: translate(-50%, -44%) translateY(0);
+}
+
+#wall-card.hiding {
+  opacity: 0;
+  transform: translate(-50%, -44%) translateY(20px);
+}
+
+.card-accent-bar {
+  position: absolute;
+  top: 0; left: 36px; right: 36px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  border-radius: 0 0 3px 3px;
+}
+
+.card-header {
+  display: flex; align-items: center;
+  gap: 10px; margin-bottom: 24px;
+}
+
+.card-star { font-size: 20px; }
+
+.card-title {
+  font-size: 18px; font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  flex: 1;
+}
+
+.batch-badge {
+  font-size: 15px; font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.06);
+  border-radius: 20px; padding: 3px 10px;
+  display: none;
+}
+
+#names-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 28px;
+  row-gap: 0;
+  margin-bottom: 22px;
+}
+
+.name-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.name-item:nth-child(even) { transform: translateX(8px); }
+.name-item.revealed { opacity: 1; transform: translateX(0); }
+
+.name-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0; opacity: 0.7;
+}
+
+.name-text {
+  font-size: 46px; font-weight: 500;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.card-footer {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid rgba(232,184,75,0.12);
+}
+
+.card-cta { font-size: 16px; color: var(--text-dim); }
+
+#timer-bar-wrap {
+  position: absolute;
+  bottom: 0; left: 36px; right: 36px;
+  height: 2px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 0 0 2px 2px;
+  overflow: hidden;
+}
+#timer-bar {
+  height: 100%; width: 0%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+</style>
+</head>
+<body>
+
+<div id="wall-card">
+  <div class="card-accent-bar"></div>
+  <div class="card-header">
+    <span class="card-star">⭐</span>
+    <span class="card-title">Inner Circle</span>
+    <span class="batch-badge" id="batch-badge"></span>
+  </div>
+  <div id="names-grid"></div>
+  <div class="card-footer">
+    <span class="card-cta">Thank you for supporting The Unconvinced</span>
+  </div>
+  <div id="timer-bar-wrap"><div id="timer-bar"></div></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const wallRef = doc(db, "innerCircleWall", "state");
+
+const BATCH_SIZE = 16;
+const AUTO_ADVANCE_MS = 12000;
+let autoTimer = null;
+let currentBatch = 0;
+let allNames = [];
+let totalBatches = 0;
+let isVisible = false;
+
+onSnapshot(wallRef, snap => {
+  if (!snap.exists()) return;
+  const data    = snap.data();
+  const names   = data.names   || [];
+  const visible = data.visible || false;
+  const batch   = data.batch   || 0;
+
+  // Always update names and render
+  allNames     = names;
+  totalBatches = Math.ceil(allNames.length / BATCH_SIZE);
+  currentBatch = batch;
+  if (allNames.length) renderBatch(currentBatch);
+
+  // Show/hide — always apply regardless of previous state
+  if (visible) showCard();
+  else hideCard();
+});
+
+function renderBatch(idx) {
+  const start = idx * BATCH_SIZE;
+  const batch = allNames.slice(start, start + BATCH_SIZE);
+  const grid  = document.getElementById("names-grid");
+  grid.innerHTML = batch.map(name =>
+    `<div class="name-item"><span class="name-dot"></span><span class="name-text">${esc(name)}</span></div>`
+  ).join("");
+  const badge = document.getElementById("batch-badge");
+  if (totalBatches > 1) {
+    badge.style.display = "block";
+    badge.textContent = `${idx + 1} / ${totalBatches}`;
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function showCard() {
+  isVisible = true;
+  const card = document.getElementById("wall-card");
+  card.classList.remove("hiding");
+  void card.offsetWidth;
+  card.classList.add("visible");
+  document.querySelectorAll(".name-item").forEach((el, i) => {
+    el.classList.remove("revealed");
+    setTimeout(() => el.classList.add("revealed"), 60 + i * 40);
+  });
+}
+
+function hideCard() {
+  isVisible = false;
+  const card = document.getElementById("wall-card");
+  card.classList.remove("visible");
+  card.classList.add("hiding");
+}
+
+function esc(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
