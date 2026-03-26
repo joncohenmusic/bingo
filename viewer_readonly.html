@@ -6,205 +6,72 @@
 <title>Believer Bingo – Watch Live</title>
 <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #0a0a1a; --cell-bg: #1a1a3e; --cell-hover: #252560;
-  --neon-pink: #ff2d55; --neon-blue: #00d4ff; --neon-green: #39ff14;
-  --neon-yellow: #ffe600; --neon-purple: #bf5fff;
-  --text: #f0f0ff; --text-dim: #8888aa; --gold: #ffd700;
-}
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  background:var(--bg); font-family:'Lexend',sans-serif; color:var(--text);
-  min-height:100vh; display:flex; flex-direction:column;
-  align-items:center; padding:20px 16px 40px;
-}
-.scanline-overlay {
-  position:fixed; top:0; left:0; right:0; bottom:0;
-  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);
-  pointer-events:none; z-index:100;
-}
-.vignette {
-  position:fixed; top:0; left:0; right:0; bottom:0;
-  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5) 100%);
-  pointer-events:none; z-index:99;
-}
-
-/* ── Header ── */
-.header { text-align:center; margin-bottom:12px; }
-.title {
-  font-family:'Bangers',cursive; font-size:clamp(2.2rem,6vw,3.5rem);
-  letter-spacing:3px; line-height:1;
-  background:linear-gradient(135deg,var(--neon-pink),var(--neon-blue));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 12px rgba(255,45,85,.5));
-}
-.subtitle {
-  font-size:.8rem; letter-spacing:2px; text-transform:uppercase;
-  color:var(--text-dim); margin-top:4px;
-}
-
-/* ── Watch-only badge ── */
-.watch-badge {
-  display:inline-flex; align-items:center; gap:6px;
-  background:rgba(255,230,0,.12); border:1px solid rgba(255,230,0,.35);
-  border-radius:20px; padding:4px 14px; font-size:.75rem;
-  color:var(--neon-yellow); letter-spacing:1px; text-transform:uppercase;
-  margin-bottom:14px;
-}
-.watch-badge::before { content:"👁"; font-size:.9rem; }
-
-/* ── Score bar ── */
-.score-bar {
-  display:flex; gap:24px; margin-bottom:14px;
-  font-size:.8rem; color:var(--text-dim); letter-spacing:1px;
-}
-.score-bar span { color:var(--neon-blue); font-weight:700; }
-
-/* ── Grid ── */
-.bingo-grid {
-  display:grid; grid-template-columns:repeat(3,1fr);
-  gap:8px; width:100%; max-width:480px; margin-bottom:20px;
-}
-.cell {
-  background:var(--cell-bg);
-  border:1px solid rgba(0,212,255,.2);
-  border-radius:12px; padding:12px 8px;
-  min-height:80px; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; text-align:center;
-  font-size:clamp(.62rem,.9vw + .5rem,.78rem); font-weight:600;
-  line-height:1.3; position:relative; overflow:hidden;
-  /* No pointer cursor — this is read-only */
-  cursor:default;
-  transition:box-shadow .3s;
-}
-.cell.marked {
-  background:linear-gradient(135deg,rgba(255,45,85,.25),rgba(191,95,255,.25));
-  border-color:var(--neon-pink);
-  box-shadow:0 0 14px rgba(255,45,85,.35), inset 0 0 10px rgba(255,45,85,.1);
-}
-.cell.marked::after {
-  content:'✓';
-  position:absolute; top:5px; right:8px;
-  font-size:.75rem; color:var(--neon-green); opacity:.8;
-}
-.cell-caller {
-  font-size:.58rem; font-weight:400; color:var(--neon-blue);
-  margin-top:4px; opacity:.85;
-}
-.cell.win-highlight {
-  animation:winPulse .6s ease infinite alternate;
-  box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3),inset 0 0 15px rgba(255,215,0,.2);
-  border-color:var(--gold) !important;
-}
-@keyframes winPulse {
-  from { box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3); }
-  to   { box-shadow:0 0 35px rgba(255,215,0,.8),0 0 70px rgba(255,215,0,.5); }
-}
-
-/* ── Mark animation ── */
-@keyframes cellPop {
-  0%   { transform:scale(.85); opacity:.4; }
-  60%  { transform:scale(1.06); }
-  100% { transform:scale(1); opacity:1; }
-}
-.cell.just-marked { animation:cellPop .4s cubic-bezier(.34,1.56,.64,1) forwards; }
-
-/* ── BINGO overlay ── */
-.bingo-overlay {
-  position:fixed; top:0; left:0; right:0; bottom:0;
-  background:rgba(0,0,0,.85); display:flex; align-items:center;
-  justify-content:center; z-index:200; opacity:0; pointer-events:none;
-  transition:opacity .3s;
-}
-.bingo-overlay.active { opacity:1; pointer-events:all; }
-.bingo-text {
-  font-family:'Bangers',cursive; font-size:clamp(5rem,18vw,10rem);
-  letter-spacing:8px;
-  background:linear-gradient(135deg,var(--neon-yellow),var(--neon-pink),var(--neon-blue));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 30px rgba(255,230,0,.7));
-  animation:bigtextPop .5s cubic-bezier(.34,1.56,.64,1);
-}
-@keyframes bigtextPop {
-  0%  { transform:scale(.3) rotate(-8deg); opacity:0; }
-  100%{ transform:scale(1) rotate(0deg);   opacity:1; }
-}
-
-/* ── Membership CTA ── */
-.cta-bar {
-  width:100%; max-width:480px;
-  background:linear-gradient(135deg,rgba(255,45,85,.15),rgba(0,212,255,.15));
-  border:1px solid rgba(255,45,85,.4);
-  border-radius:16px; padding:16px 20px;
-  text-align:center;
-}
-.cta-bar .cta-headline {
-  font-family:'Bangers',cursive; font-size:1.4rem; letter-spacing:2px;
-  color:var(--neon-yellow); margin-bottom:6px;
-}
-.cta-bar .cta-body {
-  font-size:.78rem; color:var(--text-dim); line-height:1.5; margin-bottom:12px;
-}
-.cta-bar .cta-body strong { color:var(--text); }
-.cta-btn {
-  display:inline-block;
-  background:linear-gradient(135deg,var(--neon-pink),var(--neon-purple));
-  color:#fff; font-family:'Lexend',sans-serif; font-weight:700;
-  font-size:.85rem; letter-spacing:1px; text-transform:uppercase;
-  padding:10px 24px; border-radius:30px; text-decoration:none;
-  box-shadow:0 0 18px rgba(255,45,85,.5);
-  transition:transform .15s, box-shadow .15s;
-}
-.cta-btn:hover { transform:scale(1.04); box-shadow:0 0 26px rgba(255,45,85,.7); }
-
-/* ── Status dot ── */
-.live-dot {
-  display:inline-block; width:8px; height:8px; border-radius:50%;
-  background:var(--neon-green);
-  box-shadow:0 0 6px var(--neon-green);
-  margin-right:6px;
-  animation:pulse 1.5s ease infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity:1; } 50% { opacity:.3; }
-}
-.status-line {
-  font-size:.7rem; color:var(--text-dim); text-align:center;
-  margin-bottom:10px; letter-spacing:1px;
-}
+:root{--bg:#0a0a1a;--cell-bg:#1a1a3e;--cell-hover:#252560;--neon-pink:#ff2d55;--neon-blue:#00d4ff;--neon-green:#39ff14;--neon-yellow:#ffe600;--neon-purple:#bf5fff;--text:#f0f0ff;--text-dim:#8888aa;--gold:#ffd700;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px;}
+.scanline-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:100;}
+.vignette{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5) 100%);pointer-events:none;z-index:99;}
+.wrapper{width:min(98vw,460px);display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10;}
+.title{font-family:'Bangers',cursive;font-size:clamp(42px,10vw,68px);letter-spacing:6px;text-transform:uppercase;background:linear-gradient(135deg,var(--neon-pink),var(--neon-blue),var(--neon-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(255,45,85,.5)) drop-shadow(0 0 40px rgba(0,212,255,.3));animation:titlePulse 3s ease-in-out infinite;line-height:1;text-align:center;}
+@keyframes titlePulse{0%,100%{filter:drop-shadow(0 0 20px rgba(255,45,85,.5)) drop-shadow(0 0 40px rgba(0,212,255,.3));}50%{filter:drop-shadow(0 0 30px rgba(255,45,85,.7)) drop-shadow(0 0 60px rgba(0,212,255,.5));}}
+.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;text-align:center;line-height:1.6;}
+.watch-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,230,0,.12);border:1px solid rgba(255,230,0,.35);border-radius:20px;padding:4px 14px;font-size:11px;color:var(--neon-yellow);letter-spacing:1px;text-transform:uppercase;}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--neon-green);box-shadow:0 0 6px var(--neon-green);margin-right:5px;animation:livePulse 1.5s ease infinite;}
+@keyframes livePulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.status-line{font-size:11px;color:var(--text-dim);text-align:center;letter-spacing:1px;}
+.score-bar{display:flex;gap:24px;align-items:center;justify-content:center;}
+.score-item{font-size:14px;font-weight:600;color:var(--text-dim);}
+.score-item span{color:var(--neon-blue);font-size:20px;font-family:'Bangers',cursive;letter-spacing:2px;}
+.bingo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;width:100%;background:linear-gradient(135deg,rgba(255,45,85,.08),rgba(0,212,255,.08));border:2px solid rgba(255,45,85,.3);border-radius:18px;box-shadow:0 0 30px rgba(255,45,85,.12),0 0 60px rgba(0,212,255,.08),inset 0 0 30px rgba(0,0,0,.3);}
+.cell{aspect-ratio:4/3;background:var(--cell-bg);border:1px solid rgba(255,255,255,.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px 6px;cursor:default;transition:all .2s ease;position:relative;overflow:hidden;user-select:none;}
+.cell-text{font-size:clamp(10px,2.2vw,13px);font-weight:600;line-height:1.3;color:var(--text);}
+.cell-caller{font-size:clamp(8px,1.6vw,10px);color:var(--neon-yellow);margin-top:4px;font-weight:700;letter-spacing:.5px;}
+.cell-pending-label{font-size:clamp(7px,1.5vw,9px);color:var(--neon-yellow);margin-top:3px;opacity:.85;}
+.cell.marked{background:linear-gradient(135deg,var(--neon-pink),#cc1144);border-color:var(--neon-pink);box-shadow:0 0 20px rgba(255,45,85,.5),0 0 40px rgba(255,45,85,.2),inset 0 0 15px rgba(255,255,255,.1);}
+.cell.marked .cell-text{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);}
+.cell.marked::after{content:'✓';position:absolute;top:5px;right:7px;font-size:14px;opacity:.8;}
+.cell.pending{border-color:rgba(255,230,0,.7);animation:pendingPulse 1.5s ease-in-out infinite;}
+@keyframes pendingPulse{0%,100%{box-shadow:0 0 8px rgba(255,230,0,.2);border-color:rgba(255,230,0,.5);}50%{box-shadow:0 0 20px rgba(255,230,0,.5),0 0 35px rgba(255,230,0,.2);border-color:rgba(255,230,0,.9);}}
+.cell.free-space{background:linear-gradient(135deg,#2a1a0a,#3d1a00);border-color:rgba(255,100,0,.4);}
+.cell.free-space .cell-text{font-family:'Bangers',cursive;font-size:clamp(13px,2.6vw,17px);letter-spacing:2px;color:#ff6600;text-shadow:0 0 10px rgba(255,100,0,.5);}
+.cell.win-highlight{animation:winPulse .6s ease infinite alternate;box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3),inset 0 0 15px rgba(255,215,0,.2);border-color:var(--gold)!important;}
+@keyframes winPulse{from{box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3);}to{box-shadow:0 0 35px rgba(255,215,0,.8),0 0 70px rgba(255,215,0,.5);}}
+@keyframes markPop{0%{transform:scale(.8)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+.cell.just-marked{animation:markPop .4s cubic-bezier(.175,.885,.32,1.275);}
+.waiting-msg{grid-column:1/-1;color:var(--text-dim);text-align:center;padding:40px 20px;font-size:14px;line-height:2;}
+.cta-bar{width:100%;background:linear-gradient(135deg,rgba(255,45,85,.15),rgba(0,212,255,.15));border:1px solid rgba(255,45,85,.4);border-radius:16px;padding:16px 20px;text-align:center;}
+.cta-headline{font-family:'Bangers',cursive;font-size:1.4rem;letter-spacing:2px;color:var(--neon-yellow);margin-bottom:6px;}
+.cta-body{font-size:.78rem;color:var(--text-dim);line-height:1.5;margin-bottom:12px;}
+.cta-body strong{color:var(--text);}
+.cta-btn{display:inline-block;background:linear-gradient(135deg,var(--neon-pink),var(--neon-purple));color:#fff;font-family:'Lexend',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:1px;text-transform:uppercase;padding:10px 24px;border-radius:30px;text-decoration:none;box-shadow:0 0 18px rgba(255,45,85,.5);transition:transform .15s,box-shadow .15s;}
+.cta-btn:hover{transform:scale(1.04);box-shadow:0 0 26px rgba(255,45,85,.7);}
+.bingo-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .3s;}
+.bingo-overlay.active{opacity:1;pointer-events:all;}
+.bingo-text{font-family:'Bangers',cursive;font-size:clamp(5rem,18vw,10rem);letter-spacing:8px;background:linear-gradient(135deg,var(--neon-yellow),var(--neon-pink),var(--neon-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 30px rgba(255,230,0,.7));animation:bigtextPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes bigtextPop{0%{transform:scale(.3) rotate(-8deg);opacity:0;}100%{transform:scale(1) rotate(0deg);opacity:1;}}
 </style>
 </head>
 <body>
 <div class="scanline-overlay"></div>
 <div class="vignette"></div>
 
-<div class="header">
+<div class="wrapper">
   <div class="title">Believer Bingo</div>
-  <div class="subtitle">The Unconvinced · Live</div>
-</div>
-
-<div class="watch-badge">Watch mode</div>
-
-<div class="status-line" id="statusLine">
-  <span class="live-dot"></span>Connecting to live board…
-</div>
-
-<div class="score-bar">
-  <div>Marked: <span id="markedCount">0</span> / 12</div>
-  <div>Lines: <span id="lineCount">0</span></div>
-</div>
-
-<div class="bingo-grid" id="bingoGrid"></div>
-
-<div class="cta-bar">
-  <div class="cta-headline">🔒 Want to play along?</div>
-  <div class="cta-body">
-    <strong>YouTube members get the interactive board</strong> — mark squares in real time,
-    get your name on the cell when Jon approves it. All tiers included.
+  <div class="subtitle">The Unconvinced Livestream</div>
+  <div class="watch-badge">👁 Watch Mode</div>
+  <div class="status-line" id="statusLine"><span class="live-dot"></span>Connecting…</div>
+  <div class="score-bar">
+    <div class="score-item">Marked: <span id="markedCount">0</span></div>
+    <div class="score-item">Lines: <span id="lineCount">0</span></div>
   </div>
-  <a class="cta-btn" href="https://www.youtube.com/@theunconvinced/join" target="_blank">
-    Join The Unconvinced →
-  </a>
+  <div class="bingo-grid" id="bingoGrid">
+    <div class="waiting-msg">⏳ Waiting for the stream to start...</div>
+  </div>
+  <div class="cta-bar">
+    <div class="cta-headline">🔒 Want to play along?</div>
+    <div class="cta-body"><strong>YouTube members get the interactive board</strong> — mark squares in real time and get your name on the cell when Jon approves it. All tiers included.</div>
+    <a class="cta-btn" href="https://www.youtube.com/@theunconvinced/join" target="_blank">Join The Unconvinced →</a>
+  </div>
 </div>
 
 <div class="bingo-overlay" id="bingoOverlay" onclick="this.classList.remove('active')">
@@ -213,112 +80,118 @@ body {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot }
+import { getFirestore, doc, collection, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ════════════════════════════════════════════════
-//  🔧  PASTE YOUR FIREBASE CONFIG HERE
-//  (same config as your other bingo files)
-// ════════════════════════════════════════════════
 const firebaseConfig = {
-   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
   authDomain: "believer-bingo.firebaseapp.com",
   projectId: "believer-bingo",
   storageBucket: "believer-bingo.firebasestorage.app",
   messagingSenderId: "1054324566020",
   appId: "1:1054324566020:web:dc6739c69458011efe2d51"
 };
-// ════════════════════════════════════════════════
 
+const FREE_IDX = 4;
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
-let boardSquares  = [];
-let markedCells   = {};
-let prevMarked    = {};
+let boardSquares = [], markedCells = {}, pendingCells = {};
+let prevMarked = {}, detectedLines = new Set(), initialLoad = true;
 
-// ── Render grid (no click handlers) ──────────────
-function renderGrid() {
-  const grid = document.getElementById('bingoGrid');
-  grid.innerHTML = '';
-  boardSquares.forEach((sq, i) => {
-    const cell = document.createElement('div');
-    cell.className = 'cell' + (markedCells[i] ? ' marked' : '');
-    cell.id = 'cell-' + i;
-    const txt = document.createElement('div');
-    txt.textContent = sq;
-    cell.appendChild(txt);
-    if (markedCells[i]?.caller) {
-      const caller = document.createElement('div');
-      caller.className = 'cell-caller';
-      caller.textContent = '— ' + markedCells[i].caller;
-      cell.appendChild(caller);
-    }
-    grid.appendChild(cell);
-  });
-  updateScores();
+function computeWinLines(total) {
+  if (total <= 9) return [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return [[0,1,2],[3,4,5],[6,7,8],[9,10,11],[0,3,6,9],[1,4,7,10],[2,5,8,11],[0,4,8],[2,4,6],[3,7,11],[1,5,9]];
 }
 
-// ── Animate newly marked cells ───────────────────
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function buildBoard() {
+  const grid = document.getElementById('bingoGrid');
+  grid.innerHTML = '';
+  if (!boardSquares.length) {
+    grid.innerHTML = '<div class="waiting-msg">⏳ Waiting for the stream to start...</div>';
+    updateScore(); return;
+  }
+  const FREE = FREE_IDX, TOTAL = boardSquares.length + 1;
+  const WIN = computeWinLines(TOTAL);
+  grid.style.gridTemplateRows = 'repeat('+Math.ceil(TOTAL/3)+',1fr)';
+
+  for (let i = 0; i < TOTAL; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.id = 'cell-' + i;
+    const isFree = (i === FREE);
+    const caller = markedCells[String(i)];
+    const isPend = pendingCells[i] !== undefined;
+    const text = isFree ? '🔥 CRASH OUT 🔥' : (boardSquares[i > FREE ? i - 1 : i] || '?');
+
+    if (isFree) cell.classList.add('free-space');
+    if (caller) {
+      cell.classList.add('marked');
+      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-caller">@'+esc(caller.replace(/^@/,''))+'</span>';
+    } else if (isPend) {
+      cell.classList.add('pending');
+      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting approval</span>';
+    } else {
+      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span>';
+    }
+    // No click handlers — read-only
+
+    detectedLines.forEach(function(k){
+      if (WIN[+k] && WIN[+k].includes(i)) cell.classList.add('win-highlight');
+    });
+    grid.appendChild(cell);
+  }
+  updateScore();
+}
+
 function animateNewMarks() {
-  boardSquares.forEach((_, i) => {
-    if (markedCells[i] && !prevMarked[i]) {
+  const TOTAL = boardSquares.length + 1;
+  for (let i = 0; i < TOTAL; i++) {
+    if (markedCells[String(i)] && !prevMarked[String(i)]) {
       const el = document.getElementById('cell-' + i);
       if (el) { el.classList.add('just-marked'); setTimeout(() => el.classList.remove('just-marked'), 500); }
     }
-  });
+  }
 }
 
-// ── Scores + line detection ───────────────────────
-const LINES = [
-  [0,1,2],[3,4,5],[6,7,8],[9,10,11],         // rows
-  [0,3,6,9],[1,4,7,10],[2,5,8,11],           // cols
-  [0,4,8],[2,4,6]                            // diagonals (approx for 3-col)
-];
-function updateScores() {
-  const count = Object.keys(markedCells).length;
-  document.getElementById('markedCount').textContent = count;
-  let lines = 0;
-  let winCells = new Set();
-  LINES.forEach(line => {
-    if (line.every(i => markedCells[i])) {
-      lines++;
-      line.forEach(i => winCells.add(i));
+function checkBingo() {
+  const TOTAL = boardSquares.length + 1, FREE = FREE_IDX;
+  const WIN = computeWinLines(TOTAL);
+  WIN.forEach(function(line, idx) {
+    const k = String(idx);
+    if (!detectedLines.has(k) && line.every(i => i === FREE || markedCells[String(i)])) {
+      detectedLines.add(k);
+      document.getElementById('bingoOverlay').classList.add('active');
+      setTimeout(() => document.getElementById('bingoOverlay').classList.remove('active'), 3000);
     }
   });
-  document.getElementById('lineCount').textContent = lines;
-  document.querySelectorAll('.cell').forEach((el, i) => {
-    el.classList.toggle('win-highlight', winCells.has(i));
-  });
-  if (lines > 0) {
-    document.getElementById('bingoOverlay').classList.add('active');
-    setTimeout(() => document.getElementById('bingoOverlay').classList.remove('active'), 3000);
-  }
 }
 
-// ── Firebase listeners ────────────────────────────
-const gameRef = doc(db, 'games', 'current');
+function updateScore() {
+  document.getElementById('markedCount').textContent = Object.keys(markedCells).length;
+  document.getElementById('lineCount').textContent = detectedLines.size;
+}
 
-onSnapshot(gameRef, snap => {
-  if (!snap.exists()) {
-    document.getElementById('statusLine').innerHTML =
-      '<span class="live-dot"></span>Waiting for stream to start…';
-    return;
-  }
-  const data = snap.data();
-  prevMarked = { ...markedCells };
+onSnapshot(doc(db, 'games', 'current'), function(snap) {
+  prevMarked = Object.assign({}, markedCells);
+  boardSquares = snap.exists() ? (snap.data().squares || []) : [];
+  markedCells  = snap.exists() ? (snap.data().markedCells || {}) : {};
 
-  boardSquares  = data.squares  || boardSquares;
-  markedCells   = data.marked   || {};
+  document.getElementById('statusLine').innerHTML = snap.exists()
+    ? '<span class="live-dot"></span>Live board — updates in real time'
+    : '<span class="live-dot"></span>Waiting for stream to start…';
 
-  document.getElementById('statusLine').innerHTML =
-    '<span class="live-dot"></span>Live board — updates in real time';
+  if (!initialLoad) { checkBingo(); animateNewMarks(); }
+  buildBoard();
+});
 
-  renderGrid();
-  animateNewMarks();
-}, err => {
-  document.getElementById('statusLine').textContent = 'Connection error — retrying…';
-  console.error(err);
+onSnapshot(collection(db, 'games', 'current', 'pending'), function(snap) {
+  pendingCells = {};
+  snap.forEach(function(d){ pendingCells[d.data().cellIndex] = d.id; });
+  initialLoad = false;
+  buildBoard();
 });
 </script>
 </body>
