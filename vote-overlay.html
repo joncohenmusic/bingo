@@ -124,6 +124,9 @@ function triggerBlast(voters) {
     `<div class="voter-chip" style="animation-delay:${0.3 + i * 0.1}s">⚡ ${esc(v)}</div>`
   ).join("");
   blast.className = "active";
+  // Play sound
+  const snd = new Audio("https://joncohenmusic.github.io/bingo/verdict.mp3");
+  snd.play().catch(() => {});
   if (blastTimer) clearTimeout(blastTimer);
   blastTimer = setTimeout(dismissBlast, 9000);
 }
