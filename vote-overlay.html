@@ -8,17 +8,17 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
 
 /* Small persistent counter — bottom right, appears when votes > 0 */
 #vote-counter{
-  position:fixed;bottom:60px;right:60px;
+  position:fixed;bottom:80px;right:80px;
   background:rgba(8,8,15,.85);
   border:2px solid rgba(232,184,75,.5);
-  border-radius:14px;padding:10px 20px;
-  display:flex;align-items:center;gap:10px;
+  border-radius:20px;padding:18px 36px;
+  display:flex;align-items:center;gap:16px;
   opacity:0;transition:opacity .5s;
   backdrop-filter:blur(6px);
 }
 #vote-counter.visible{opacity:1;}
-#vote-pip{width:9px;height:9px;border-radius:50%;background:#e8b84b;box-shadow:0 0 8px #e8b84b;}
-#vote-label{font-size:14px;font-weight:700;letter-spacing:1px;color:#e8b84b;}
+#vote-pip{width:18px;height:18px;border-radius:50%;background:#e8b84b;box-shadow:0 0 14px #e8b84b;}
+#vote-label{font-size:36px;font-weight:700;letter-spacing:2px;color:#e8b84b;}
 
 /* Full verdict blast */
 #verdict-blast{
