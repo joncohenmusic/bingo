@@ -79,7 +79,7 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot }
+import { getFirestore, doc, onSnapshot, updateDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -93,11 +93,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+const voteDoc = doc(db, "vote", "current");
 
 let lastFired = false;
 let blastTimer = null;
 
-onSnapshot(doc(db, "vote", "current"), snap => {
+onSnapshot(voteDoc, snap => {
   if (!snap.exists()) return;
   const data = snap.data();
   const count  = Object.values(data.votes || {}).filter(Boolean).length;
@@ -127,6 +128,10 @@ function triggerBlast(voters) {
   // Play sound
   const snd = new Audio("https://joncohenmusic.github.io/bingo/verdict.mp3");
   snd.play().catch(() => {});
+  // Reset Firestore after 3s so scene-switching doesn't re-trigger
+  setTimeout(() => {
+    updateDoc(voteDoc, { fired: false, votes: {}, voters: [] }).catch(() => {});
+  }, 3000);
   if (blastTimer) clearTimeout(blastTimer);
   blastTimer = setTimeout(dismissBlast, 9000);
 }
