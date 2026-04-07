@@ -97,6 +97,7 @@ const voteDoc = doc(db, "vote", "current");
 
 let lastFired = false;
 let blastTimer = null;
+let blasting   = false;  // true while overlay is on screen — blocks early dismissal
 
 onSnapshot(voteDoc, snap => {
   if (!snap.exists()) return;
@@ -109,16 +110,18 @@ onSnapshot(voteDoc, snap => {
   const counter = document.getElementById("vote-counter");
   document.getElementById("vc-count").textContent = count;
   document.getElementById("vc-thresh").textContent = thresh;
-  if (count > 0 && !fired) counter.classList.add("visible");
+  if (count > 0 && !fired && !blasting) counter.classList.add("visible");
   else counter.classList.remove("visible");
 
   // Verdict blast — only trigger once per firing
   if (fired && !lastFired) triggerBlast(data.voters || []);
-  if (!fired && lastFired) dismissBlast();
+  // Only dismiss via the blastTimer — ignore Firestore resets while blasting
+  if (!fired && lastFired && !blasting) dismissBlast();
   lastFired = fired;
 });
 
 function triggerBlast(voters) {
+  blasting = true;
   const blast = document.getElementById("verdict-blast");
   const votersEl = document.getElementById("blast-voters");
   votersEl.innerHTML = voters.map((v, i) =>
@@ -133,10 +136,11 @@ function triggerBlast(voters) {
     updateDoc(voteDoc, { fired: false, votes: {}, voters: [] }).catch(() => {});
   }, 3000);
   if (blastTimer) clearTimeout(blastTimer);
-  blastTimer = setTimeout(dismissBlast, 9000);
+  blastTimer = setTimeout(dismissBlast, 10000);  // overlay stays for 10s
 }
 
 function dismissBlast() {
+  blasting = false;
   const blast = document.getElementById("verdict-blast");
   blast.className = "out";
   setTimeout(() => { blast.className = ""; }, 600);
