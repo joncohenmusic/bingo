@@ -172,7 +172,14 @@ const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 const wallRef = doc(db, "innerCircleWall", "state");
 
-const BATCH_SIZE = 16;
+const BATCH_SIZE_MAX = 16;
+let currentBatchSize = 16;
+
+function evenBatchSize(n) {
+  if (n <= BATCH_SIZE_MAX) return n || 1;
+  const pages = Math.ceil(n / BATCH_SIZE_MAX);
+  return Math.ceil(n / pages);
+}
 const AUTO_ADVANCE_MS = 12000;
 let autoTimer = null;
 let currentBatch = 0;
@@ -189,7 +196,8 @@ onSnapshot(wallRef, snap => {
 
   // Always update names and render
   allNames     = names;
-  totalBatches = Math.ceil(allNames.length / BATCH_SIZE);
+  currentBatchSize = data.batchSize || evenBatchSize(names.length);
+  totalBatches = Math.ceil(allNames.length / currentBatchSize) || 1;
   currentBatch = batch;
   if (allNames.length) renderBatch(currentBatch);
 
@@ -199,8 +207,8 @@ onSnapshot(wallRef, snap => {
 });
 
 function renderBatch(idx) {
-  const start = idx * BATCH_SIZE;
-  const batch = allNames.slice(start, start + BATCH_SIZE);
+  const start = idx * currentBatchSize;
+  const batch = allNames.slice(start, start + currentBatchSize);
   const grid  = document.getElementById("names-grid");
   grid.innerHTML = batch.map(name =>
     `<div class="name-item"><span class="name-dot"></span><span class="name-text">${esc(name)}</span></div>`
