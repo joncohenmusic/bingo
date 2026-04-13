@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inner Circle — The Unconvinced</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --gold: #E8B84B;
+  --gold-dim: rgba(232,184,75,0.15);
+  --gold-border: rgba(232,184,75,0.35);
+  --bg: #0e0d0b;
+  --surface: rgba(22,18,10,0.95);
+  --text: #F2F0EC;
+  --text-dim: rgba(242,240,236,0.45);
+  --red: #ff2d55;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Background texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(232,184,75,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 80% 80%, rgba(232,184,75,0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--gold-border);
+  border-radius: 20px;
+  padding: 48px 44px 44px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.4),
+    0 32px 80px rgba(0,0,0,0.6),
+    0 0 60px rgba(232,184,75,0.04);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 48px; right: 48px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  border-radius: 0 0 2px 2px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eyebrow::before {
+  content: '⭐';
+  font-size: 13px;
+}
+
+h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.15;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+
+.field {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+  border-color: var(--gold-border);
+  box-shadow: 0 0 0 3px rgba(232,184,75,0.08);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder {
+  color: rgba(242,240,236,0.2);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 28px 0;
+}
+
+button {
+  width: 100%;
+  background: var(--gold);
+  color: #0e0d0b;
+  border: none;
+  border-radius: 10px;
+  padding: 15px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: none;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #0e0d0b;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* States */
+#state-form { display: block; }
+#state-success { display: none; }
+#state-error { display: none; }
+
+.success-card {
+  text-align: center;
+  padding: 12px 0;
+}
+
+.success-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  display: block;
+  animation: pop 0.5s cubic-bezier(0.22,1,0.36,1);
+}
+
+@keyframes pop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.success-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+
+.success-msg {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+.success-name {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.error-msg {
+  background: rgba(255,45,85,0.08);
+  border: 1px solid rgba(255,45,85,0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #ff6b8a;
+  margin-top: 16px;
+  display: none;
+}
+
+.error-msg.visible { display: block; }
+
+.brand {
+  text-align: center;
+  margin-top: 28px;
+  font-size: 12px;
+  color: rgba(242,240,236,0.2);
+  letter-spacing: 0.5px;
+}
+
+/* Mobile */
+@media (max-width: 520px) {
+  .card { padding: 36px 28px 32px; }
+  h1 { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- FORM STATE -->
+  <div id="state-form">
+    <div class="eyebrow">Inner Circle</div>
+    <h1>Join the Wall</h1>
+    <p class="subtitle">Enter your display name and the access phrase from your welcome message to activate your Inner Circle perks.</p>
+
+    <div class="field">
+      <label for="displayName">Your display name</label>
+      <input type="text" id="displayName" placeholder="Exactly as you use it in chat" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="hint">Use the name you'll appear as during live streams.</div>
+    </div>
+
+    <div class="field">
+      <label for="accessPhrase">Access phrase</label>
+      <input type="password" id="accessPhrase" placeholder="From your Patreon welcome message" autocomplete="off">
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="divider"></div>
+
+    <button id="submitBtn" onclick="handleSubmit()">
+      <span id="btnText">Activate Inner Circle Access</span>
+      <div class="spinner" id="btnSpinner"></div>
+    </button>
+  </div>
+
+  <!-- SUCCESS STATE -->
+  <div id="state-success">
+    <div class="success-card">
+      <span class="success-icon">⭐</span>
+      <div class="success-title">You're in.</div>
+      <p class="success-msg">
+        Welcome to the Inner Circle, <span class="success-name" id="confirmedName"></span>.<br><br>
+        Your name is now on the Wall and your Kill Switch vote is active. You'll see both during the next live stream.
+      </p>
+    </div>
+  </div>
+
+  <div class="brand">The Unconvinced</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const ACCESS_PHRASE = "treefrog";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+const BATCH_SIZE_MAX = 16;
+function evenBatchSize(n) {
+  if (n <= BATCH_SIZE_MAX) return n || 1;
+  const pages = Math.ceil(n / BATCH_SIZE_MAX);
+  return Math.ceil(n / pages);
+}
+
+function showError(msg) {
+  const el = document.getElementById("errorMsg");
+  el.textContent = msg;
+  el.classList.add("visible");
+}
+
+function clearError() {
+  const el = document.getElementById("errorMsg");
+  el.classList.remove("visible");
+}
+
+function setLoading(on) {
+  const btn = document.getElementById("submitBtn");
+  const txt = document.getElementById("btnText");
+  const spin = document.getElementById("btnSpinner");
+  btn.disabled = on;
+  txt.style.display = on ? "none" : "inline";
+  spin.style.display = on ? "block" : "none";
+}
+
+window.handleSubmit = async function() {
+  clearError();
+
+  const name   = document.getElementById("displayName").value.trim();
+  const phrase = document.getElementById("accessPhrase").value.trim().toLowerCase();
+
+  if (!name) { showError("Please enter your display name."); return; }
+  if (!phrase) { showError("Please enter the access phrase."); return; }
+  if (phrase !== ACCESS_PHRASE) {
+    showError("That access phrase isn't right. Check your Patreon welcome message.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const membersRef = doc(db, "config", "innerCircle");
+    const wallRef    = doc(db, "innerCircleWall", "state");
+
+    const snap    = await getDoc(membersRef);
+    const members = snap.exists() ? (snap.data().members || []) : [];
+
+    if (!members.includes(name)) {
+      members.push(name);
+      members.sort();
+    }
+
+    const batchSize = evenBatchSize(members.length);
+
+    await setDoc(membersRef, { members }, { merge: true });
+    await setDoc(wallRef,    { names: members, batchSize }, { merge: true });
+
+    document.getElementById("confirmedName").textContent = name;
+    document.getElementById("state-form").style.display    = "none";
+    document.getElementById("state-success").style.display = "block";
+
+  } catch (err) {
+    console.error(err);
+    showError("Something went wrong. Please try again or contact Jon directly.");
+  } finally {
+    setLoading(false);
+  }
+};
+</script>
+
+</body>
+</html>
