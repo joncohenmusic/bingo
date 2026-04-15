@@ -373,17 +373,22 @@ window.handleSubmit = async function() {
     const membersRef = doc(db, "config", "innerCircle");
     const wallRef    = doc(db, "innerCircleWall", "state");
 
-    const snap    = await getDoc(membersRef);
-    const members = snap.exists() ? (snap.data().members || []) : [];
+    const snap          = await getDoc(membersRef);
+    const members        = snap.exists() ? (snap.data().members || []) : [];
+    const patreonMembers = snap.exists() ? (snap.data().patreonMembers || []) : [];
 
     if (!members.includes(name)) {
       members.push(name);
       members.sort();
     }
+    if (!patreonMembers.includes(name)) {
+      patreonMembers.push(name);
+      patreonMembers.sort();
+    }
 
     const batchSize = evenBatchSize(members.length);
 
-    await setDoc(membersRef, { members }, { merge: true });
+    await setDoc(membersRef, { members, patreonMembers }, { merge: true });
     await setDoc(wallRef,    { names: members, batchSize }, { merge: true });
 
     document.getElementById("confirmedName").textContent = name;
