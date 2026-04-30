@@ -92,16 +92,30 @@ const firebaseConfig = {
   appId: "1:1054324566020:web:dc6739c69458011efe2d51"
 };
 
-const FREE_IDX = 4;
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
 let boardSquares = [], markedCells = {}, pendingCells = {};
 let prevMarked = {}, detectedLines = new Set(), initialLoad = true;
+// Shape state — defaults to legacy 3x4 with FREE at index 4
+let boardCols = 3, boardRows = 4, boardFreeIdx = 4;
 
-function computeWinLines(total) {
-  if (total <= 9) return [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  return [[0,1,2],[3,4,5],[6,7,8],[9,10,11],[0,3,6,9],[1,4,7,10],[2,5,8,11],[0,4,8],[2,4,6],[3,7,11],[1,5,9]];
+function defaultFreeIndex(cols, rows){
+  if (cols===3 && rows===4) return 4;
+  return Math.floor(rows/2)*cols + Math.floor(cols/2);
+}
+
+function computeWinLines(cols, rows, freeIdx) {
+  if (cols===3 && rows===3) return [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  if (cols===3 && rows===4) return [[0,1,2],[3,4,5],[6,7,8],[9,10,11],[0,3,6,9],[1,4,7,10],[2,5,8,11],[0,4,8],[2,4,6],[3,7,11],[1,5,9]];
+  const lines=[];
+  for (let r=0;r<rows;r++){ const ln=[]; for(let c=0;c<cols;c++) ln.push(r*cols+c); lines.push(ln); }
+  for (let c=0;c<cols;c++){ const ln=[]; for(let r=0;r<rows;r++) ln.push(r*cols+c); lines.push(ln); }
+  if (cols===rows){
+    const d1=[],d2=[]; for(let i=0;i<cols;i++){ d1.push(i*cols+i); d2.push(i*cols+(cols-1-i)); }
+    lines.push(d1,d2);
+  }
+  return lines;
 }
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -110,12 +124,16 @@ function buildBoard() {
   const grid = document.getElementById('bingoGrid');
   grid.innerHTML = '';
   if (!boardSquares.length) {
+    grid.style.gridTemplateColumns = 'repeat(3,1fr)';
+    grid.style.gridTemplateRows = '';
     grid.innerHTML = '<div class="waiting-msg">⏳ Waiting for the stream to start...</div>';
     updateScore(); return;
   }
-  const FREE = FREE_IDX, TOTAL = boardSquares.length + 1;
-  const WIN = computeWinLines(TOTAL);
-  grid.style.gridTemplateRows = 'repeat('+Math.ceil(TOTAL/3)+',1fr)';
+  const cols = boardCols, rows = boardRows, FREE = boardFreeIdx;
+  const TOTAL = cols * rows;
+  const WIN = computeWinLines(cols, rows, FREE);
+  grid.style.gridTemplateColumns = 'repeat('+cols+',1fr)';
+  grid.style.gridTemplateRows = 'repeat('+rows+',1fr)';
 
   for (let i = 0; i < TOTAL; i++) {
     const cell = document.createElement('div');
@@ -147,7 +165,7 @@ function buildBoard() {
 }
 
 function animateNewMarks() {
-  const TOTAL = boardSquares.length + 1;
+  const TOTAL = boardCols * boardRows;
   for (let i = 0; i < TOTAL; i++) {
     if (markedCells[String(i)] && !prevMarked[String(i)]) {
       const el = document.getElementById('cell-' + i);
@@ -157,8 +175,8 @@ function animateNewMarks() {
 }
 
 function checkBingo() {
-  const TOTAL = boardSquares.length + 1, FREE = FREE_IDX;
-  const WIN = computeWinLines(TOTAL);
+  const FREE = boardFreeIdx;
+  const WIN = computeWinLines(boardCols, boardRows, FREE);
   WIN.forEach(function(line, idx) {
     const k = String(idx);
     if (!detectedLines.has(k) && line.every(i => i === FREE || markedCells[String(i)])) {
@@ -178,6 +196,17 @@ onSnapshot(doc(db, 'games', 'current'), function(snap) {
   prevMarked = Object.assign({}, markedCells);
   boardSquares = snap.exists() ? (snap.data().squares || []) : [];
   markedCells  = snap.exists() ? (snap.data().markedCells || {}) : {};
+  // Shape: prefer explicit doc fields, else infer from square count for legacy boards
+  const data = snap.exists() ? snap.data() : {};
+  if (data.cols && data.rows) {
+    boardCols = data.cols; boardRows = data.rows;
+  } else {
+    const total = boardSquares.length + 1;
+    if (total === 9)       { boardCols=3; boardRows=3; }
+    else if (total === 12) { boardCols=3; boardRows=4; }
+    else                   { boardCols=3; boardRows=Math.ceil(total/3); }
+  }
+  boardFreeIdx = (typeof data.freeIndex === 'number') ? data.freeIndex : defaultFreeIndex(boardCols, boardRows);
 
   document.getElementById('statusLine').innerHTML = snap.exists()
     ? '<span class="live-dot"></span>Live board — updates in real time'
