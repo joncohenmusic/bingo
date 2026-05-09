@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0a0904">
+<title>Rate This Caller — The Unconvinced</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0904;
+  --surface: #14110a;
+  --surface-2: #1d1810;
+  --gold: #E8B84B;
+  --gold-dim: rgba(232,184,75,0.3);
+  --gold-glow: rgba(232,184,75,0.55);
+  --text: #F2F2F2;
+  --text-dim: rgba(242,242,242,0.5);
+  --text-faint: rgba(242,242,242,0.25);
+  --grid: rgba(255,255,255,0.04);
+  --grid-strong: rgba(255,255,255,0.08);
+  --tint-genuine: rgba(57,255,20,0.04);
+  --tint-shifty: rgba(255,160,30,0.05);
+  --tint-sincere: rgba(108,155,255,0.04);
+  --tint-troll: rgba(255,45,85,0.05);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding: max(env(safe-area-inset-top), 12px) 16px max(env(safe-area-inset-bottom), 12px);
+  background:
+    radial-gradient(ellipse at top, rgba(232,184,75,0.06), transparent 50%),
+    var(--bg);
+}
+
+/* ── Header ────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.brand-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.vote-count {
+  text-align: right;
+}
+.vote-count-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.vote-count-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* ── Caller bar ────────────────────────────────────── */
+.caller-bar {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+  border: 1px solid rgba(232,184,75,0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.caller-bar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.caller-bar-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.caller-bar.no-caller .caller-bar-name {
+  color: var(--text-faint);
+  font-style: italic;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  font-style: italic;
+}
+
+.live-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff2d55;
+  animation: pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.caller-bar.no-caller .live-pip {
+  background: var(--text-faint);
+  animation: none;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,45,85,0.5); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 5px rgba(255,45,85,0); }
+}
+
+/* ── Plot ──────────────────────────────────────────── */
+.plot-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 0;
+  margin-bottom: 14px;
+}
+
+.plot {
+  position: relative;
+  width: 100%;
+  max-width: min(92vw, calc(100vh - 280px));
+  aspect-ratio: 1 / 1;
+  background:
+    linear-gradient(135deg, var(--tint-shifty) 0%, transparent 50%, var(--tint-sincere) 100%),
+    linear-gradient(45deg, var(--tint-troll) 0%, transparent 50%, var(--tint-genuine) 100%),
+    var(--surface);
+  border: 1px solid rgba(232,184,75,0.18);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 0 60px rgba(0,0,0,0.4),
+    0 8px 32px rgba(0,0,0,0.6);
+  touch-action: none;
+  overflow: hidden;
+}
+
+/* Grid lines */
+.plot::before,
+.plot::after {
+  content: '';
+  position: absolute;
+  background: var(--grid-strong);
+  pointer-events: none;
+}
+.plot::before {
+  /* horizontal axis */
+  left: 6%; right: 6%;
+  top: 50%; height: 1px;
+  transform: translateY(-0.5px);
+}
+.plot::after {
+  /* vertical axis */
+  top: 6%; bottom: 6%;
+  left: 50%; width: 1px;
+  transform: translateX(-0.5px);
+}
+
+/* Quarter grid lines */
+.plot-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.plot-grid::before,
+.plot-grid::after {
+  content: '';
+  position: absolute;
+  background: var(--grid);
+}
+.plot-grid::before {
+  left: 6%; right: 6%;
+  top: 25%; height: 1px;
+  box-shadow: 0 calc(50vmin * 0.5 - 1px) 0 var(--grid);
+}
+.plot-grid::after {
+  top: 6%; bottom: 6%;
+  left: 25%; width: 1px;
+  box-shadow: calc(50vmin * 0.5 - 1px) 0 0 var(--grid);
+}
+
+/* Axis labels */
+.axis-label {
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 2;
+}
+.axis-substance-top { top: 8px; left: 50%; transform: translateX(-50%); }
+.axis-substance-bot { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.axis-faith-left { left: 8px; top: 50%; transform: translateY(-50%) rotate(-90deg); transform-origin: left center; white-space: nowrap; }
+.axis-faith-right { right: 8px; top: 50%; transform: translateY(-50%) rotate(90deg); transform-origin: right center; white-space: nowrap; }
+
+/* Quadrant labels */
+.quadrant-label {
+  position: absolute;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.18);
+  pointer-events: none;
+  z-index: 1;
+}
+.q-genuine { top: 16%; right: 10%; }
+.q-shifty  { top: 16%; left: 10%; }
+.q-sincere { bottom: 16%; right: 10%; }
+.q-troll   { bottom: 16%; left: 10%; }
+
+/* Origin marker */
+.origin-marker {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--text-faint);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* User's dot */
+.user-dot {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #ffd86b, var(--gold) 60%, #c89938 100%);
+  box-shadow:
+    0 0 0 3px rgba(232,184,75,0.18),
+    0 0 24px var(--gold-glow),
+    0 4px 12px rgba(0,0,0,0.6),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+  z-index: 10;
+  transition: transform 0.08s ease-out, box-shadow 0.2s;
+  cursor: grab;
+  will-change: left, top;
+}
+.user-dot.dragging {
+  cursor: grabbing;
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 6px rgba(232,184,75,0.22),
+    0 0 32px var(--gold-glow),
+    0 6px 18px rgba(0,0,0,0.7),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.user-dot::after {
+  content: 'YOU';
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+
+/* Aggregate dot */
+.agg-dot {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, #f0f0f0 50%, #c8c8c8 100%);
+  border: 2px solid var(--gold);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.3),
+    0 0 18px rgba(255,255,255,0.4),
+    0 3px 10px rgba(0,0,0,0.5);
+  z-index: 9;
+  pointer-events: none;
+  transition: left 0.4s cubic-bezier(0.22,1,0.36,1), top 0.4s cubic-bezier(0.22,1,0.36,1);
+  will-change: left, top;
+}
+.agg-dot.hidden { display: none; }
+
+.agg-dot::after {
+  content: 'CROWD';
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+
+.agg-dot::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  animation: agg-pulse 2.4s ease-in-out infinite;
+}
+@keyframes agg-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.4); opacity: 0; }
+}
+
+/* ── Locked overlay ────────────────────────────────── */
+.locked-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,9,4,0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 14px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+.locked-overlay.active { display: flex; }
+
+.locked-overlay-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-shadow: 0 0 20px var(--gold-glow);
+  margin-bottom: 6px;
+}
+.locked-overlay-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* ── Sandbox mode (no live caller) ─────────────────── */
+body.sandbox .plot {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+body.sandbox .user-dot {
+  opacity: 0.5;
+}
+body.sandbox .user-dot::after {
+  content: 'PRACTICE';
+  color: var(--text-dim);
+}
+.sandbox-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 100px;
+  padding: 5px 12px;
+  display: none;
+  z-index: 5;
+  pointer-events: none;
+}
+body.sandbox .sandbox-banner { display: block; }
+
+/* ── Footer ────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 100px;
+  padding: 6px 12px 6px 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.user-chip-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+
+.user-chip-name {
+  font-weight: 600;
+  color: var(--text);
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-chip-edit {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-left: 4px;
+  padding: 2px 4px;
+}
+.user-chip-edit:hover { color: var(--gold); }
+
+.coords {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+}
+
+/* ── Name modal ────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--gold-dim);
+  border-radius: 18px;
+  padding: 28px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+
+.modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.modal-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-input {
+  width: 100%;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 9px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.modal-input:focus { border-color: var(--gold); }
+.modal-input::placeholder { color: var(--text-faint); }
+
+.modal-btn {
+  width: 100%;
+  background: var(--gold);
+  border: none;
+  border-radius: 9px;
+  padding: 13px;
+  color: #1a1200;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.05s;
+}
+.modal-btn:hover:not(:disabled) { opacity: 0.9; }
+.modal-btn:active:not(:disabled) { transform: scale(0.98); }
+.modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Status toast ──────────────────────────────────── */
+.toast {
+  position: fixed;
+  top: max(env(safe-area-inset-top), 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--surface);
+  border: 1px solid var(--gold-dim);
+  border-radius: 100px;
+  padding: 8px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 200;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Compact mode for small screens ────────────────── */
+@media (max-height: 640px) {
+  .quadrant-label { font-size: 14px; }
+  .brand-title { font-size: 18px; }
+  .caller-bar { padding: 8px 12px; margin-bottom: 10px; }
+  .caller-bar-name { font-size: 16px; }
+}
+</style>
+</head>
+<body class="sandbox">
+
+<div class="header">
+  <div class="brand">
+    <div class="brand-title">RATE THIS CALLER</div>
+    <div class="brand-sub">The Unconvinced</div>
+  </div>
+  <div class="vote-count">
+    <div class="vote-count-num" id="vote-count-num">0</div>
+    <div class="vote-count-label">Voters</div>
+  </div>
+</div>
+
+<div class="caller-bar no-caller" id="caller-bar">
+  <div class="live-pip"></div>
+  <div class="caller-bar-label">CALLER</div>
+  <div class="caller-bar-name" id="caller-name">Waiting for caller…</div>
+</div>
+
+<div class="plot-wrap">
+  <div class="plot" id="plot">
+    <div class="plot-grid"></div>
+    <div class="axis-label axis-substance-top">SUBSTANCE +</div>
+    <div class="axis-label axis-substance-bot">SUBSTANCE −</div>
+    <div class="axis-label axis-faith-left">GOOD FAITH −</div>
+    <div class="axis-label axis-faith-right">GOOD FAITH +</div>
+    <div class="quadrant-label q-genuine">GENUINE</div>
+    <div class="quadrant-label q-shifty">SHIFTY</div>
+    <div class="quadrant-label q-sincere">SINCERE</div>
+    <div class="quadrant-label q-troll">TROLL</div>
+    <div class="origin-marker"></div>
+    <div class="sandbox-banner">PRACTICE — VOTES START WHEN CALLER IS LIVE</div>
+    <div class="agg-dot hidden" id="agg-dot"></div>
+    <div class="user-dot" id="user-dot"></div>
+    <div class="locked-overlay" id="locked-overlay">
+      <div class="locked-overlay-text">VERDICT IN</div>
+      <div class="locked-overlay-sub">Voting closed</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="user-chip">
+    <div class="user-chip-dot"></div>
+    <span class="user-chip-name" id="user-chip-name">—</span>
+    <button class="user-chip-edit" id="edit-name-btn">edit</button>
+  </div>
+  <div class="coords" id="coords">0.0, 0.0</div>
+</div>
+
+<div class="modal-overlay active" id="name-modal">
+  <div class="modal">
+    <div class="modal-title">WHAT'S YOUR NAME?</div>
+    <div class="modal-sub">Use whatever you go by in chat. This shows up nowhere — it just helps Jon recognise his regulars.</div>
+    <input type="text" class="modal-input" id="name-input" placeholder="Your handle…" maxlength="40" autocomplete="off">
+    <button class="modal-btn" id="name-submit" disabled>Start Voting</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const stateRef = doc(db, "rateThisCaller", "state");
+
+// ── Identity ──────────────────────────────────────────
+const LS_KEYS = { id: "rtc_uid", name: "rtc_name" };
+let userId = localStorage.getItem(LS_KEYS.id);
+if (!userId) {
+  userId = crypto.randomUUID();
+  localStorage.setItem(LS_KEYS.id, userId);
+}
+let displayName = localStorage.getItem(LS_KEYS.name) || "";
+const voteRef = doc(db, "rateThisCaller", "state", "votes", userId);
+
+// ── State ─────────────────────────────────────────────
+let currentSessionId = null;
+let isLocked = false;
+let userPos = { x: 0, y: 0 };          // axis units, −10..+10
+let plotRect = null;                   // cached on resize/start of drag
+let pendingWriteTimer = null;
+const WRITE_DEBOUNCE_MS = 220;
+
+// ── DOM ───────────────────────────────────────────────
+const plot         = document.getElementById("plot");
+const userDot      = document.getElementById("user-dot");
+const aggDot       = document.getElementById("agg-dot");
+const lockedOL     = document.getElementById("locked-overlay");
+const callerBar    = document.getElementById("caller-bar");
+const callerName   = document.getElementById("caller-name");
+const voteCountNum = document.getElementById("vote-count-num");
+const userChipName = document.getElementById("user-chip-name");
+const editNameBtn  = document.getElementById("edit-name-btn");
+const coordsEl     = document.getElementById("coords");
+const nameModal    = document.getElementById("name-modal");
+const nameInput    = document.getElementById("name-input");
+const nameSubmit   = document.getElementById("name-submit");
+const toastEl      = document.getElementById("toast");
+
+// ── Toast helper ──────────────────────────────────────
+let toastTimer = null;
+function toast(msg, ms = 2500) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), ms);
+}
+
+// ── Name flow ─────────────────────────────────────────
+function showNameModal(prefill = "") {
+  nameInput.value = prefill;
+  nameSubmit.disabled = !prefill.trim();
+  nameModal.classList.add("active");
+  setTimeout(() => nameInput.focus(), 100);
+}
+function hideNameModal() { nameModal.classList.remove("active"); }
+
+nameInput.addEventListener("input", () => {
+  nameSubmit.disabled = !nameInput.value.trim();
+});
+nameInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !nameSubmit.disabled) nameSubmit.click();
+});
+nameSubmit.addEventListener("click", () => {
+  const v = nameInput.value.trim();
+  if (!v) return;
+  displayName = v;
+  localStorage.setItem(LS_KEYS.name, displayName);
+  userChipName.textContent = displayName;
+  hideNameModal();
+  // Do not push a vote until they actually move the dot.
+});
+editNameBtn.addEventListener("click", () => showNameModal(displayName));
+
+if (displayName) {
+  userChipName.textContent = displayName;
+  hideNameModal();
+}
+
+// ── Coord conversion ──────────────────────────────────
+// Plot is square. Use percentage positioning so it survives resize.
+// Padding inside the plot keeps dots from clipping at edges.
+const PLOT_PADDING_PCT = 6;       // matches axis line insets
+const AXIS_RANGE       = 10;      // −10 .. +10
+
+function axisToPctX(x) {
+  // x: −10 .. +10  →  pct from left edge
+  const half = (50 - PLOT_PADDING_PCT);
+  return 50 + (x / AXIS_RANGE) * half;
+}
+function axisToPctY(y) {
+  // y: −10 (bottom) .. +10 (top)  →  pct from top
+  const half = (50 - PLOT_PADDING_PCT);
+  return 50 - (y / AXIS_RANGE) * half;
+}
+function clientToAxis(clientX, clientY) {
+  const r = plotRect || plot.getBoundingClientRect();
+  const half = (50 - PLOT_PADDING_PCT);
+  const xPct = ((clientX - r.left) / r.width) * 100;
+  const yPct = ((clientY - r.top)  / r.height) * 100;
+  let ax = ((xPct - 50) / half) * AXIS_RANGE;
+  let ay = -((yPct - 50) / half) * AXIS_RANGE;
+  ax = Math.max(-AXIS_RANGE, Math.min(AXIS_RANGE, ax));
+  ay = Math.max(-AXIS_RANGE, Math.min(AXIS_RANGE, ay));
+  return { x: ax, y: ay };
+}
+
+function paintUserDot() {
+  userDot.style.left = axisToPctX(userPos.x) + "%";
+  userDot.style.top  = axisToPctY(userPos.y) + "%";
+  coordsEl.textContent = `${userPos.x >= 0 ? "+" : ""}${userPos.x.toFixed(1)}, ${userPos.y >= 0 ? "+" : ""}${userPos.y.toFixed(1)}`;
+}
+paintUserDot();
+
+// ── Drag interaction ──────────────────────────────────
+let dragging = false;
+
+function onPointerDown(e) {
+  if (isLocked) return;
+  if (!displayName) { showNameModal(); return; }
+  e.preventDefault();
+  dragging = true;
+  plotRect = plot.getBoundingClientRect();
+  userDot.classList.add("dragging");
+  movePointer(e);
+}
+function movePointer(e) {
+  const t = e.touches ? e.touches[0] : e;
+  const { x, y } = clientToAxis(t.clientX, t.clientY);
+  userPos = { x, y };
+  paintUserDot();
+  scheduleWrite();
+}
+function onPointerMove(e) {
+  if (!dragging) return;
+  e.preventDefault();
+  movePointer(e);
+}
+function onPointerUp() {
+  if (!dragging) return;
+  dragging = false;
+  userDot.classList.remove("dragging");
+  flushWrite();
+}
+
+plot.addEventListener("pointerdown", onPointerDown);
+window.addEventListener("pointermove", onPointerMove, { passive: false });
+window.addEventListener("pointerup", onPointerUp);
+window.addEventListener("pointercancel", onPointerUp);
+window.addEventListener("resize", () => { plotRect = null; paintUserDot(); });
+
+// ── Write to Firestore (debounced) ────────────────────
+function scheduleWrite() {
+  if (pendingWriteTimer) return;
+  pendingWriteTimer = setTimeout(() => {
+    pendingWriteTimer = null;
+    pushVote();
+  }, WRITE_DEBOUNCE_MS);
+}
+function flushWrite() {
+  if (pendingWriteTimer) {
+    clearTimeout(pendingWriteTimer);
+    pendingWriteTimer = null;
+  }
+  pushVote();
+}
+async function pushVote() {
+  if (!displayName || !currentSessionId || isLocked) return;
+  try {
+    await setDoc(voteRef, {
+      displayName,
+      substance: userPos.y,
+      goodFaith: userPos.x,
+      sessionId: currentSessionId,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("vote write failed", err);
+  }
+}
+
+// ── State subscription ────────────────────────────────
+onSnapshot(stateRef, snap => {
+  const d = snap.exists() ? snap.data() : {};
+  const newSession = d.sessionId || null;
+  const newCaller  = d.callerName || "";
+  const visible    = d.visible !== false;
+  const locked     = !!d.locked;
+
+  // Update caller bar
+  if (newCaller) {
+    callerName.textContent = newCaller;
+    callerBar.classList.remove("no-caller");
+  } else {
+    callerName.textContent = "Waiting for caller…";
+    callerBar.classList.add("no-caller");
+  }
+
+  // Sandbox mode = no live session
+  document.body.classList.toggle("sandbox", !newSession);
+
+  // Session change → reset user dot to centre and clear stale vote
+  if (newSession && newSession !== currentSessionId) {
+    const wasFirstLoad = currentSessionId === null;
+    currentSessionId = newSession;
+    userPos = { x: 0, y: 0 };
+    paintUserDot();
+    if (!wasFirstLoad) {
+      toast("New caller — reset");
+      // Clear our previous vote so we don't pollute the new session
+      deleteDoc(voteRef).catch(() => {});
+    }
+  } else if (!newSession) {
+    currentSessionId = null;
+  }
+
+  // Lock state
+  isLocked = locked;
+  lockedOL.classList.toggle("active", isLocked);
+});
+
+// ── Votes subscription (aggregate) ────────────────────
+const votesRef = collection(db, "rateThisCaller", "state", "votes");
+onSnapshot(votesRef, snap => {
+  if (!currentSessionId) {
+    aggDot.classList.add("hidden");
+    voteCountNum.textContent = "0";
+    return;
+  }
+  let sx = 0, sy = 0, n = 0;
+  snap.forEach(doc => {
+    const v = doc.data();
+    if (v.sessionId !== currentSessionId) return;
+    if (typeof v.substance !== "number" || typeof v.goodFaith !== "number") return;
+    sx += v.goodFaith;
+    sy += v.substance;
+    n++;
+  });
+  voteCountNum.textContent = String(n);
+  if (n > 0) {
+    const ax = sx / n, ay = sy / n;
+    aggDot.style.left = axisToPctX(ax) + "%";
+    aggDot.style.top  = axisToPctY(ay) + "%";
+    aggDot.classList.remove("hidden");
+  } else {
+    aggDot.classList.add("hidden");
+  }
+});
+
+// Prevent iOS rubber-band on the plot
+document.addEventListener("touchmove", e => {
+  if (dragging) e.preventDefault();
+}, { passive: false });
+</script>
+</body>
+</html>
