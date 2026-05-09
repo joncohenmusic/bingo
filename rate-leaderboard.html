@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rate This Caller — Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --gold: #E8B84B;
+  --gold-glow: rgba(232,184,75,0.55);
+  --green: #39ff14;
+  --red: #ff2d55;
+  --bg: rgba(14, 11, 4, 0.92);
+  --text: #F2F2F2;
+  --text-dim: rgba(242,242,242,0.55);
+  --text-faint: rgba(242,242,242,0.3);
+}
+
+body {
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  position: relative;
+}
+
+#card {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) translateY(40px);
+  width: 980px;
+  background: var(--bg);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(232,184,75,0.45);
+  border-radius: 24px;
+  padding: 44px 48px 40px;
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22,1,0.36,1);
+}
+#card.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) translateY(0);
+}
+
+.card-accent-bar {
+  position: absolute;
+  top: 0; left: 48px; right: 48px;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  border-radius: 0 0 4px 4px;
+}
+
+.title-block { text-align: center; margin-bottom: 28px; }
+.title-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 78px;
+  letter-spacing: 5px;
+  color: var(--gold);
+  line-height: 1;
+  text-shadow: 0 0 24px var(--gold-glow);
+}
+
+.section {
+  margin-bottom: 22px;
+}
+.section:last-child { margin-bottom: 0; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.section-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.section-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 3px;
+}
+.section.best .section-label  { color: var(--green); }
+.section.worst .section-label { color: var(--red); }
+
+.row {
+  display: grid;
+  grid-template-columns: 50px 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  background: rgba(0,0,0,0.32);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.row.revealed { opacity: 1; transform: translateY(0); }
+.row:last-child { margin-bottom: 0; }
+
+.section.best .row.rank-1 {
+  background: linear-gradient(180deg, rgba(57,255,20,0.14), rgba(57,255,20,0.04));
+  border-color: rgba(57,255,20,0.4);
+  box-shadow: 0 0 24px rgba(57,255,20,0.18);
+}
+.section.worst .row.rank-1 {
+  background: linear-gradient(180deg, rgba(255,45,85,0.14), rgba(255,45,85,0.04));
+  border-color: rgba(255,45,85,0.4);
+  box-shadow: 0 0 24px rgba(255,45,85,0.18);
+}
+
+.rank {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1;
+}
+.section.best .rank-1 .rank { color: var(--green); text-shadow: 0 0 12px rgba(57,255,20,0.5); }
+.section.worst .rank-1 .rank { color: var(--red); text-shadow: 0 0 12px rgba(255,45,85,0.5); }
+
+.name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 36px;
+  letter-spacing: 1.5px;
+  color: var(--text);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.verdict-tag {
+  display: inline-block;
+  font-weight: 700;
+  margin-right: 8px;
+}
+.verdict-tag.GENUINE  { color: var(--green); }
+.verdict-tag.TROLL    { color: var(--red); }
+.verdict-tag.SHIFTY   { color: #ffa01e; }
+.verdict-tag.SINCERE  { color: #6c9bff; }
+.verdict-tag.UNDECIDED { color: var(--text-dim); }
+
+.score-pill {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 44px;
+  letter-spacing: 1px;
+  line-height: 1;
+  padding: 8px 18px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(232,184,75,0.3);
+  color: var(--gold);
+  min-width: 90px;
+  text-align: center;
+}
+.section.best  .rank-1 .score-pill { color: var(--green); border-color: rgba(57,255,20,0.5); }
+.section.worst .rank-1 .score-pill { color: var(--red);   border-color: rgba(255,45,85,0.5); }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 2.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+
+.footer-cta {
+  text-align: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(232,184,75,0.18);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 2.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.footer-cta strong { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div id="card">
+  <div class="card-accent-bar"></div>
+
+  <div class="title-block">
+    <div class="title-eyebrow">The Unconvinced — Tonight's Stream</div>
+    <div class="title">LEADERBOARD</div>
+  </div>
+
+  <div class="section best">
+    <div class="section-header">
+      <span class="section-icon">🏆</span>
+      <span class="section-label">BEST CONVERSATIONS</span>
+    </div>
+    <div id="best-rows"></div>
+  </div>
+
+  <div class="section worst">
+    <div class="section-header">
+      <span class="section-icon">💀</span>
+      <span class="section-label">WORST CONVERSATIONS</span>
+    </div>
+    <div id="worst-rows"></div>
+  </div>
+
+  <div class="footer-cta">
+    Rate every caller live at <strong>joncohenmusic.github.io/bingo/rate.html</strong>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot, collection }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const stateRef   = doc(db, "rateThisCaller", "state");
+const historyRef = collection(db, "rateThisCaller", "history");
+
+const card     = document.getElementById("card");
+const bestRows  = document.getElementById("best-rows");
+const worstRows = document.getElementById("worst-rows");
+
+let isVisible = false;
+function showCard() {
+  if (isVisible) return;
+  isVisible = true;
+  card.classList.add("visible");
+  staggerReveal();
+}
+function hideCard() {
+  isVisible = false;
+  card.classList.remove("visible");
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escClass(s) {
+  return (s || "").replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+function rowHTML(rank, entry) {
+  const verdict = entry.verdict || "—";
+  return `
+    <div class="row rank-${rank}">
+      <div class="rank">#${rank}</div>
+      <div class="name-block">
+        <div class="name">${esc(entry.callerName || "—")}</div>
+        <div class="meta">
+          <span class="verdict-tag ${escClass(verdict)}">${esc(verdict)}</span>
+          ${entry.voterCount || 0} vote${entry.voterCount === 1 ? "" : "s"}
+        </div>
+      </div>
+      <div class="score-pill">${entry.score ?? "—"}</div>
+    </div>
+  `;
+}
+
+function renderEmpty(container) {
+  container.innerHTML = `<div class="empty-state">No locked verdicts yet</div>`;
+}
+
+function renderRanks(container, entries) {
+  if (!entries.length) { renderEmpty(container); return; }
+  container.innerHTML = entries.slice(0, 3).map((e, i) => rowHTML(i + 1, e)).join("");
+}
+
+function staggerReveal() {
+  document.querySelectorAll(".row").forEach((row, i) => {
+    row.classList.remove("revealed");
+    setTimeout(() => row.classList.add("revealed"), 200 + i * 120);
+  });
+}
+
+// ── Visibility (driven by /rateThisCaller/state.leaderboardVisible) ──
+onSnapshot(stateRef, snap => {
+  if (!snap.exists()) { hideCard(); return; }
+  const d = snap.data();
+  if (d.leaderboardVisible) showCard();
+  else hideCard();
+});
+
+// ── History → ranked rows ──
+onSnapshot(historyRef, snap => {
+  const all = [];
+  snap.forEach(d => all.push(d.data()));
+  // Filter incomplete entries
+  const complete = all.filter(e => typeof e.score === "number" && e.callerName);
+  const best  = [...complete].sort((a, b) => b.score - a.score);
+  const worst = [...complete].sort((a, b) => a.score - b.score);
+  renderRanks(bestRows,  best);
+  renderRanks(worstRows, worst);
+  if (isVisible) staggerReveal();
+});
+</script>
+</body>
+</html>
