@@ -99,6 +99,7 @@ const db  = getFirestore(app);
 
 let username = "", boardSquares = [], markedCells = {}, pendingCells = {};
 let detectedLines = new Set(), initialLoad = true;
+let currentCaller = "";  // active caller from rateThisCaller/state, captured on each pending submission
 // Shape state — defaults to legacy 3x4 with FREE at index 4
 let boardCols = 3, boardRows = 4, boardFreeIdx = 4;
 
@@ -136,6 +137,10 @@ function joinGame() {
 }
 
 function startListening() {
+  // Track the active rate-this-caller session so we can stamp it on bingo claims
+  onSnapshot(doc(db,'rateThisCaller','state'), function(snap) {
+    currentCaller = snap.exists() ? (snap.data().callerName || "") : "";
+  });
   onSnapshot(doc(db,'games','current'), function(snap) {
     const prev = Object.assign({}, markedCells);
     boardSquares = snap.exists() ? (snap.data().squares||[]) : [];
@@ -210,7 +215,9 @@ async function submitCell(gridIndex, text) {
   } else {
     try {
       await addDoc(collection(db,'games','current','pending'), {
-        cellIndex: gridIndex, username, squareText: text, submittedAt: serverTimestamp()
+        cellIndex: gridIndex, username, squareText: text,
+        caller: currentCaller || null,
+        submittedAt: serverTimestamp()
       });
       showStatus('"'+text.replace(/\n/g,' ')+'" called — waiting for Jon! 👀');
     } catch(e) { showStatus('⚠️ Connection error — try again'); }
