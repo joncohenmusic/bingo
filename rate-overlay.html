@@ -77,7 +77,7 @@ body {
 
 .title-eyebrow {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 4px;
   color: var(--text-dim);
@@ -85,8 +85,8 @@ body {
 }
 .title {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 44px;
-  letter-spacing: 4px;
+  font-size: 56px;
+  letter-spacing: 5px;
   color: var(--gold);
   line-height: 1;
 }
@@ -99,7 +99,7 @@ body {
 }
 .count-num {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 38px;
+  font-size: 48px;
   font-weight: 700;
   color: var(--text);
   line-height: 1;
@@ -107,8 +107,9 @@ body {
 }
 .count-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 2.5px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
   color: var(--text-dim);
   text-transform: uppercase;
 }
@@ -140,9 +141,9 @@ body {
 }
 .caller-bar-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   color: var(--text-dim);
   text-transform: uppercase;
 }
@@ -230,32 +231,33 @@ body {
 .axis-label {
   position: absolute;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  letter-spacing: 2.5px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 3px;
   color: var(--text-dim);
   text-transform: uppercase;
   pointer-events: none;
   z-index: 2;
 }
-.axis-substance-top { top: 14px; left: 50%; transform: translateX(-50%); }
-.axis-substance-bot { bottom: 14px; left: 50%; transform: translateX(-50%); }
-.axis-faith-left  { left: 14px;  top: 50%; transform: translateY(-50%) rotate(-90deg); transform-origin: left center; white-space: nowrap; }
-.axis-faith-right { right: 14px; top: 50%; transform: translateY(-50%) rotate(90deg);  transform-origin: right center; white-space: nowrap; }
+.axis-substance-top { top: 18px; left: 50%; transform: translateX(-50%); }
+.axis-substance-bot { bottom: 18px; left: 50%; transform: translateX(-50%); }
+.axis-faith-left  { left: 18px;  top: 50%; transform: translateY(-50%) rotate(-90deg); transform-origin: left center; white-space: nowrap; }
+.axis-faith-right { right: 18px; top: 50%; transform: translateY(-50%) rotate(90deg);  transform-origin: right center; white-space: nowrap; }
 
 /* Quadrant labels */
 .quadrant-label {
   position: absolute;
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 36px;
-  letter-spacing: 4px;
-  color: rgba(255,255,255,0.16);
+  font-size: 64px;
+  letter-spacing: 5px;
+  color: rgba(255,255,255,0.30);
   pointer-events: none;
   z-index: 1;
 }
-.q-genuine { top: 12%; right: 8%; }
-.q-shifty  { top: 12%; left: 8%; }
-.q-sincere { bottom: 12%; right: 8%; }
-.q-troll   { bottom: 12%; left: 8%; }
+.q-genuine { top: 11%; right: 8%; }
+.q-shifty  { top: 11%; left: 8%; }
+.q-sincere { bottom: 11%; right: 8%; }
+.q-troll   { bottom: 11%; left: 8%; }
 
 /* Aggregate dot */
 .agg-dot {
@@ -327,16 +329,16 @@ body {
 }
 .verdict-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 .verdict-value {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 46px;
-  letter-spacing: 3px;
+  font-size: 60px;
+  letter-spacing: 4px;
   color: var(--gold);
   line-height: 1;
 }
@@ -345,23 +347,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 28px;
+  gap: 6px;
+  padding: 10px 32px;
   background: rgba(0,0,0,0.35);
   border: 1px solid rgba(232,184,75,0.25);
   border-radius: 12px;
 }
 .score-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 .score-value {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 64px;
+  font-size: 84px;
   letter-spacing: 1px;
   color: var(--gold);
   line-height: 1;
@@ -371,20 +373,20 @@ body {
 
 .cta {
   font-family: 'DM Sans', sans-serif;
-  font-size: 19px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   color: var(--text);
   text-align: right;
   line-height: 1.3;
 }
 .cta-eyebrow {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 2.5px;
+  letter-spacing: 3px;
   color: var(--text-dim);
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   display: block;
 }
 .cta strong {
