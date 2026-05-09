@@ -120,6 +120,12 @@ function computeWinLines(cols, rows, freeIdx) {
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Backward-compat: markedCells values may be strings (legacy) or {username, caller} (new)
+function getMarkedUser(v) {
+  if (!v) return null;
+  return (typeof v === "string") ? v : (v.username || null);
+}
+
 function buildBoard() {
   const grid = document.getElementById('bingoGrid');
   grid.innerHTML = '';
@@ -140,7 +146,8 @@ function buildBoard() {
     cell.className = 'cell';
     cell.id = 'cell-' + i;
     const isFree = (i === FREE);
-    const caller = markedCells[String(i)];
+    const markedEntry = markedCells[String(i)];
+    const caller = getMarkedUser(markedEntry);
     const isPend = pendingCells[i] !== undefined;
     const text = isFree ? '🔥 CRASH OUT 🔥' : (boardSquares[i > FREE ? i - 1 : i] || '?');
 
