@@ -124,6 +124,12 @@ function computeWinLines(cols, rows, freeIdx) {
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// Backward-compat: markedCells values may be strings (legacy) or {username, caller} (new)
+function getMarkedUser(v) {
+  if (!v) return null;
+  return (typeof v === "string") ? v : (v.username || null);
+}
+
 // Username modal
 document.getElementById('joinBtn').addEventListener('click', joinGame);
 document.getElementById('usernameInput').addEventListener('keydown', function(e){ if(e.key==='Enter') joinGame(); });
@@ -184,7 +190,8 @@ function buildBoard() {
   for (let i=0; i<TOTAL; i++) {
     const cell = document.createElement('div');
     cell.className = 'cell';
-    const isFree=(i===FREE), caller=markedCells[String(i)], isPend=pendingCells[i]!==undefined;
+    const isFree=(i===FREE), markedEntry=markedCells[String(i)], isPend=pendingCells[i]!==undefined;
+    const caller=getMarkedUser(markedEntry);
     const text = isFree ? '🔥 CRASH OUT 🔥' : (boardSquares[i>FREE?i-1:i]||'?');
     if (isFree) cell.classList.add('free-space');
     if (caller) {
@@ -208,7 +215,7 @@ async function submitCell(gridIndex, text) {
   const isAutoApprove = AUTO_APPROVE.includes(username.toLowerCase());
   if (isAutoApprove) {
     try {
-      const upd = {}; upd['markedCells.'+gridIndex] = username;
+      const upd = {}; upd['markedCells.'+gridIndex] = { username: username, caller: currentCaller || null };
       await updateDoc(doc(db,'games','current'), upd);
       showStatus('"'+text.replace(/\n/g,' ')+'" marked! 🎯');
     } catch(e) { showStatus('⚠️ Connection error — try again'); }
