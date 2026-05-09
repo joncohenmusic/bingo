@@ -261,7 +261,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 const stateRef   = doc(db, "rateThisCaller", "state");
-const historyRef = collection(db, "rateThisCaller", "history");
+const historyRef = collection(db, "rateThisCaller", "state", "history");
 
 const card     = document.getElementById("card");
 const bestRows  = document.getElementById("best-rows");
