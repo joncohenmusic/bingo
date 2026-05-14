@@ -371,14 +371,15 @@ body {
 .locked-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(10,9,4,0.78);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(10,9,4,0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-radius: 14px;
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   z-index: 20;
   pointer-events: none;
 }
@@ -386,19 +387,80 @@ body {
 
 .locked-overlay-text {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 38px;
-  letter-spacing: 4px;
-  color: var(--gold);
-  text-shadow: 0 0 20px var(--gold-glow);
-  margin-bottom: 6px;
+  font-size: 26px;
+  letter-spacing: 5px;
+  color: rgba(255,255,255,0.7);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.85);
+  margin-bottom: 2px;
 }
+
+.locked-overlay-verdict {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 62px;
+  letter-spacing: 4px;
+  color: var(--lit-color, var(--gold));
+  text-shadow:
+    0 0 22px var(--lit-glow, rgba(232,184,75,0.55)),
+    0 3px 14px rgba(0,0,0,0.8);
+  line-height: 1;
+  margin: 2px 0 -2px 0;
+}
+
+.locked-overlay-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 112px;
+  color: #fff;
+  text-shadow: 0 4px 22px rgba(0,0,0,0.9);
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
 .locked-overlay-sub {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   letter-spacing: 2.5px;
   color: var(--text-dim);
   text-transform: uppercase;
+  margin-top: 4px;
 }
+
+/* ── Quadrant lighting on lock ─────────────────────── */
+.quadrant-tint {
+  position: absolute;
+  width: 50%; height: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  z-index: 1;
+  border-radius: 14px;
+}
+.q-genuine-tint { top: 0;    right: 0;  background: radial-gradient(circle at top right,    rgba(57,255,20,0.22),  transparent 70%); }
+.q-shifty-tint  { top: 0;    left: 0;   background: radial-gradient(circle at top left,     rgba(255,160,30,0.22), transparent 70%); }
+.q-sincere-tint { bottom: 0; right: 0;  background: radial-gradient(circle at bottom right, rgba(108,155,255,0.22),transparent 70%); }
+.q-troll-tint   { bottom: 0; left: 0;   background: radial-gradient(circle at bottom left,  rgba(255,45,85,0.22),  transparent 70%); }
+
+.plot.lit-genuine .q-genuine-tint,
+.plot.lit-shifty  .q-shifty-tint,
+.plot.lit-sincere .q-sincere-tint,
+.plot.lit-troll   .q-troll-tint { opacity: 1; }
+
+/* Lift the active quadrant label above the lock overlay and brighten it */
+.plot.lit-genuine .q-genuine,
+.plot.lit-shifty  .q-shifty,
+.plot.lit-sincere .q-sincere,
+.plot.lit-troll   .q-troll {
+  color: var(--lit-color);
+  text-shadow: 0 0 18px var(--lit-glow), 0 2px 10px rgba(0,0,0,0.8);
+  font-size: 32px;
+  opacity: 1;
+  z-index: 22;
+  transition: color 0.5s, font-size 0.5s, text-shadow 0.5s;
+}
+
+.plot.lit-genuine { --lit-color: #3ddc97; --lit-glow: rgba(61,220,151,0.55); }
+.plot.lit-shifty  { --lit-color: #ffb800; --lit-glow: rgba(255,184,0,0.55); }
+.plot.lit-sincere { --lit-color: #6c9bff; --lit-glow: rgba(108,155,255,0.55); }
+.plot.lit-troll   { --lit-color: #ff2d55; --lit-glow: rgba(255,45,85,0.55); }
 
 /* ── Sandbox mode (no live caller) ─────────────────── */
 body.sandbox .plot {
@@ -624,6 +686,10 @@ body.sandbox .sandbox-banner { display: block; }
     <div class="axis-label axis-substance-bot">SUBSTANCE −</div>
     <div class="axis-label axis-faith-left">GOOD FAITH −</div>
     <div class="axis-label axis-faith-right">GOOD FAITH +</div>
+    <div class="quadrant-tint q-genuine-tint"></div>
+    <div class="quadrant-tint q-shifty-tint"></div>
+    <div class="quadrant-tint q-sincere-tint"></div>
+    <div class="quadrant-tint q-troll-tint"></div>
     <div class="quadrant-label q-genuine">GENUINE</div>
     <div class="quadrant-label q-shifty">SHIFTY</div>
     <div class="quadrant-label q-sincere">SINCERE</div>
@@ -634,7 +700,9 @@ body.sandbox .sandbox-banner { display: block; }
     <div class="user-dot" id="user-dot"></div>
     <div class="locked-overlay" id="locked-overlay">
       <div class="locked-overlay-text">VERDICT IN</div>
-      <div class="locked-overlay-sub">Voting closed</div>
+      <div class="locked-overlay-verdict" id="locked-verdict-word">—</div>
+      <div class="locked-overlay-score" id="locked-score">—</div>
+      <div class="locked-overlay-sub" id="locked-sub">Voting closed</div>
     </div>
   </div>
 </div>
@@ -700,6 +768,36 @@ const plot         = document.getElementById("plot");
 const userDot      = document.getElementById("user-dot");
 const aggDot       = document.getElementById("agg-dot");
 const lockedOL     = document.getElementById("locked-overlay");
+const lockedVerdictWord = document.getElementById("locked-verdict-word");
+const lockedScoreEl     = document.getElementById("locked-score");
+const lockedSubEl       = document.getElementById("locked-sub");
+
+// Latest aggregate — needed when the lock fires to populate the verdict display
+let lastAgg = { sub: 0, gf: 0, count: 0 };
+
+function quadrantFor(sub, gf) {
+  if (sub >= 0 && gf >= 0) return { key: "genuine", label: "Genuine" };
+  if (sub >= 0 && gf <  0) return { key: "shifty",  label: "Shifty"  };
+  if (sub <  0 && gf >= 0) return { key: "sincere", label: "Sincere" };
+  return                          { key: "troll",   label: "Troll"   };
+}
+const toScore100 = v => Math.max(0, Math.min(100, Math.round((v + 10) * 5)));
+
+function updateLockedDisplay() {
+  plot.classList.remove("lit-genuine", "lit-shifty", "lit-sincere", "lit-troll");
+  if (!isLocked) return;
+  if (lastAgg.count === 0) {
+    lockedVerdictWord.textContent = "No Votes";
+    lockedScoreEl.textContent = "—";
+    lockedSubEl.textContent = "awaiting verdict";
+    return;
+  }
+  const q = quadrantFor(lastAgg.sub, lastAgg.gf);
+  plot.classList.add("lit-" + q.key);
+  lockedVerdictWord.textContent = q.label;
+  lockedScoreEl.textContent = String(toScore100((lastAgg.sub + lastAgg.gf) / 2));
+  lockedSubEl.textContent = `${lastAgg.count} vote${lastAgg.count === 1 ? "" : "s"} · final`;
+}
 const callerBar    = document.getElementById("caller-bar");
 const callerName   = document.getElementById("caller-name");
 const voteCountNum = document.getElementById("vote-count-num");
@@ -891,6 +989,7 @@ onSnapshot(stateRef, snap => {
   // Lock state
   isLocked = locked;
   lockedOL.classList.toggle("active", isLocked);
+  updateLockedDisplay();
 });
 
 // ── Votes subscription (aggregate) ────────────────────
@@ -899,6 +998,7 @@ onSnapshot(votesRef, snap => {
   if (!currentSessionId) {
     aggDot.classList.add("hidden");
     voteCountNum.textContent = "0";
+    lastAgg = { sub: 0, gf: 0, count: 0 };
     return;
   }
   let sx = 0, sy = 0, n = 0;
@@ -916,9 +1016,12 @@ onSnapshot(votesRef, snap => {
     aggDot.style.left = axisToPctX(ax) + "%";
     aggDot.style.top  = axisToPctY(ay) + "%";
     aggDot.classList.remove("hidden");
+    lastAgg = { sub: ay, gf: ax, count: n };
   } else {
     aggDot.classList.add("hidden");
+    lastAgg = { sub: 0, gf: 0, count: 0 };
   }
+  if (isLocked) updateLockedDisplay();
 });
 
 // Prevent iOS rubber-band on the plot
