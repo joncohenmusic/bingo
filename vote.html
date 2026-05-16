@@ -82,7 +82,7 @@ select:focus{border-color:var(--gold);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, getDoc }
+import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, deleteField }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -227,14 +227,14 @@ async function withdrawVote() {
   memberName = sel.value;
   if (!memberName) return;
 
-  const snap = await getDoc(voteDoc);
-  if (!snap.exists()) return;
-  const data = snap.data();
-  const votes = { ...(data.votes || {}) };
-  delete votes[memberName];
-
-  await setDoc(voteDoc, { ...data, votes }, { merge: true });
-  myVote = null;
+  try {
+    // Use dot-notation + deleteField so the subkey is actually removed.
+    // (setDoc with merge:true would leave the key intact — map fields merge per-key.)
+    await updateDoc(voteDoc, { [`votes.${memberName}`]: deleteField() });
+    myVote = null;
+  } catch(e) {
+    console.error("Withdraw failed:", e);
+  }
 }
 
 // ── UI helpers ──
