@@ -39,6 +39,18 @@ select:focus{border-color:var(--gold);}
 .live-tally .seg.kill{color:var(--red);}
 .live-tally .seg.keep{color:var(--keep);}
 .live-tally .seg.net{color:var(--gold);}
+
+/* ── Anonymity toggle ── */
+.anon-row{margin:0 0 16px;display:flex;justify-content:center;}
+.anon-toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:8px 14px;border-radius:10px;background:#0d0d22;border:1px solid var(--gold-border);transition:all .2s;}
+.anon-toggle:hover{border-color:var(--gold);}
+.anon-toggle input{position:absolute;opacity:0;width:0;height:0;}
+.anon-track{position:relative;width:34px;height:18px;background:#1a1a30;border:1px solid rgba(232,184,75,.25);border-radius:11px;flex-shrink:0;transition:all .2s;}
+.anon-thumb{position:absolute;top:1px;left:1px;width:14px;height:14px;background:var(--text-dim);border-radius:50%;transition:all .25s cubic-bezier(.4,1,.6,1);}
+.anon-toggle input:checked + .anon-track{background:var(--gold-dim);border-color:var(--gold);}
+.anon-toggle input:checked + .anon-track .anon-thumb{left:18px;background:var(--gold);box-shadow:0 0 8px var(--gold);}
+.anon-label{font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-dim);transition:color .2s;}
+.anon-toggle input:checked ~ .anon-label{color:var(--gold);}
 .status-box{margin-top:16px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
 .status-box.kill-voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
 .status-box.keep-voted{background:var(--keep-dim);border:1px solid var(--keep-border);color:var(--keep);display:block;}
@@ -63,6 +75,14 @@ select:focus{border-color:var(--gold);}
       <select id="memberSelect">
         <option value="">Loading members...</option>
       </select>
+    </div>
+
+    <div class="anon-row">
+      <label class="anon-toggle">
+        <input type="checkbox" id="anonToggle">
+        <span class="anon-track"><span class="anon-thumb"></span></span>
+        <span class="anon-label" id="anonLabel">🎭 Hide my identity on stream</span>
+      </label>
     </div>
 
     <button class="btn-vote kill" id="btnKill" onclick="castVote('kill')">☠️ ACTIVATE KILL SWITCH</button>
@@ -99,20 +119,26 @@ const db  = getFirestore(app);
 const voteDoc    = doc(db, "vote", "current");
 const membersRef = doc(db, "config", "innerCircle");
 
-// ── Vote normalisation (legacy `true` == "kill") ──
+// ── Vote normalisation (handles all legacy + new shapes) ──
+// Returns { kind: "kill"|"keep", anon: bool } or null
 function normVote(v) {
-  if (v === true || v === "kill") return "kill";
-  if (v === "keep") return "keep";
+  if (v === true || v === "kill") return { kind: "kill", anon: false };
+  if (v === "keep") return { kind: "keep", anon: false };
+  if (v && typeof v === "object" && (v.kind === "kill" || v.kind === "keep")) {
+    return { kind: v.kind, anon: !!v.anon };
+  }
   return null;
 }
 function tallyVotes(votes) {
-  const killers = [], keepers = [];
+  const killers = [], keepers = [], anons = [];
   for (const [name, v] of Object.entries(votes || {})) {
-    const nv = normVote(v);
-    if (nv === "kill") killers.push(name);
-    else if (nv === "keep") keepers.push(name);
+    const n = normVote(v);
+    if (!n) continue;
+    if (n.kind === "kill") killers.push(name);
+    else if (n.kind === "keep") keepers.push(name);
+    if (n.anon) anons.push(name);
   }
-  return { killers, keepers, net: killers.length - keepers.length };
+  return { killers, keepers, anons, net: killers.length - keepers.length };
 }
 
 // ── Load member list dynamically ──
@@ -139,7 +165,7 @@ async function loadMembers() {
 }
 loadMembers();
 
-let myVote = null;             // "kill" | "keep" | null
+let myVote = null;             // { kind, anon } | null
 let currentState = {};
 let memberName = localStorage.getItem("ic_member") || "";
 
@@ -148,10 +174,24 @@ if (memberName) sel.value = memberName;
 sel.addEventListener("change", () => {
   memberName = sel.value;
   if (memberName) localStorage.setItem("ic_member", memberName);
-  // Re-evaluate my vote against the new identity
   myVote = normVote((currentState.votes || {})[memberName]);
   renderVoteState();
 });
+
+// ── Anonymity toggle (sticky preference) ──
+const anonToggle = document.getElementById("anonToggle");
+const anonLabel  = document.getElementById("anonLabel");
+anonToggle.checked = localStorage.getItem("ic_anon") === "true";
+function updateAnonLabel() {
+  anonLabel.textContent = anonToggle.checked
+    ? "🎭 You'll appear as Mystery Member"
+    : "🎭 Hide my identity on stream";
+}
+anonToggle.addEventListener("change", () => {
+  localStorage.setItem("ic_anon", anonToggle.checked);
+  updateAnonLabel();
+});
+updateAnonLabel();
 
 // ── Listen to Firestore ──
 onSnapshot(voteDoc, snap => {
@@ -200,12 +240,14 @@ async function castVote(kind) {
   if (!memberName) { alert("Please select your name first."); return; }
   localStorage.setItem("ic_member", memberName);
 
+  const anon = anonToggle.checked;
+
   const snap = await getDoc(voteDoc);
   const data = snap.exists() ? snap.data() : { votes: {}, threshold: 2, fired: false };
   const votes = { ...(data.votes || {}) };
-  votes[memberName] = kind;
+  votes[memberName] = { kind, anon };
 
-  const { killers, keepers, net } = tallyVotes(votes);
+  const { killers, keepers, anons, net } = tallyVotes(votes);
   const thresh = data.threshold || 2;
   const shouldFire = net >= thresh;
   // Once fired, stay fired until overlay resets — keep votes can't un-fire
@@ -216,11 +258,12 @@ async function castVote(kind) {
     ...data,
     votes,
     fired: newFired,
-    voters:    firingNow ? killers : (data.voters    || []),
-    defenders: firingNow ? keepers : (data.defenders || [])
+    voters:     firingNow ? killers : (data.voters     || []),
+    defenders:  firingNow ? keepers : (data.defenders  || []),
+    anonVoters: firingNow ? anons   : (data.anonVoters || [])
   }, { merge: true });
 
-  myVote = kind;
+  myVote = { kind, anon };
 }
 
 async function withdrawVote() {
@@ -249,17 +292,20 @@ function renderVoteState() {
   btnKill.disabled = false;
   btnKeep.disabled = false;
 
-  if (myVote === "kill") {
+  const kind    = myVote?.kind || null;
+  const anonTag = myVote?.anon ? " (anonymously)" : "";
+
+  if (kind === "kill") {
     btnKill.classList.add("active");
     btnKill.disabled = true;
     box.className = "status-box kill-voted";
-    box.textContent = "☠️ KILL vote cast. Tap SHIELD to switch, or withdraw.";
+    box.textContent = `☠️ KILL vote cast${anonTag}. Tap SHIELD to switch, or withdraw.`;
     btnWith.style.display = "block";
-  } else if (myVote === "keep") {
+  } else if (kind === "keep") {
     btnKeep.classList.add("active");
     btnKeep.disabled = true;
     box.className = "status-box keep-voted";
-    box.textContent = "🛡 SHIELD vote cast. Tap KILL to switch, or withdraw.";
+    box.textContent = `🛡 SHIELD vote cast${anonTag}. Tap KILL to switch, or withdraw.`;
     btnWith.style.display = "block";
   } else {
     box.className = "status-box";
@@ -269,13 +315,16 @@ function renderVoteState() {
 }
 
 function showFired() {
-  const voters    = currentState.voters    || [];
-  const defenders = currentState.defenders || [];
+  const voters     = currentState.voters     || [];
+  const defenders  = currentState.defenders  || [];
+  const anonSet    = new Set(currentState.anonVoters || []);
+  const mask = n => anonSet.has(n) ? "🎭 Mystery Member" : esc(n);
+
   const box = document.getElementById("statusBox");
   box.className = "status-box fired";
-  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(esc).join(", ") + "</small>";
+  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(mask).join(", ") + "</small>";
   if (defenders.length) {
-    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(esc).join(", ") + "</small>";
+    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(mask).join(", ") + "</small>";
   }
   box.innerHTML = html;
   document.getElementById("btnKill").disabled = true;
