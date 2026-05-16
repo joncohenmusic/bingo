@@ -6,19 +6,23 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-family:system-ui,-apple-system,sans-serif;}
 
-/* Small persistent counter — bottom right, appears when votes > 0 */
+/* Persistent counter — bottom right, appears when any vote activity */
 #vote-counter{
   position:fixed;bottom:80px;right:80px;
   background:rgba(8,8,15,.85);
   border:2px solid rgba(232,184,75,.5);
-  border-radius:20px;padding:18px 36px;
-  display:flex;align-items:center;gap:16px;
+  border-radius:20px;padding:18px 32px;
+  display:flex;align-items:center;gap:24px;
   opacity:0;transition:opacity .5s;
   backdrop-filter:blur(6px);
 }
 #vote-counter.visible{opacity:1;}
-#vote-pip{width:18px;height:18px;border-radius:50%;background:#e8b84b;box-shadow:0 0 14px #e8b84b;}
-#vote-label{font-size:36px;font-weight:700;letter-spacing:2px;color:#e8b84b;}
+.vc-seg{display:flex;align-items:center;gap:10px;font-size:36px;font-weight:700;letter-spacing:2px;}
+.vc-seg.kill{color:#ff2d55;text-shadow:0 0 18px rgba(255,45,85,.5);}
+.vc-seg.keep{color:#3dd68c;text-shadow:0 0 18px rgba(61,214,140,.5);}
+.vc-seg.net {color:#e8b84b;text-shadow:0 0 18px rgba(232,184,75,.5);}
+.vc-divider{width:1px;height:34px;background:rgba(232,184,75,.35);}
+.vc-net-label{font-size:18px;color:#8888aa;letter-spacing:3px;margin-right:6px;font-weight:600;}
 
 /* Full verdict blast */
 #verdict-blast{
@@ -60,13 +64,35 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
   animation:chipIn .4s ease both;
 }
 @keyframes chipIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+#blast-defenders{
+  display:none;flex-direction:column;align-items:center;gap:16px;margin-top:42px;
+}
+#blast-defenders.show{display:flex;}
+.defender-label{
+  font-size:22px;color:rgba(240,240,255,.45);
+  letter-spacing:5px;text-transform:uppercase;
+}
+.defender-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:1400px;}
+.defender-chip{
+  background:rgba(61,214,140,.1);
+  border:1px solid rgba(61,214,140,.45);
+  border-radius:40px;padding:10px 28px;
+  font-size:24px;font-weight:600;color:#7feab0;
+  letter-spacing:1.5px;
+  animation:chipIn .4s ease both;
+}
 </style>
 </head>
 <body>
 
 <div id="vote-counter">
-  <div id="vote-pip"></div>
-  <div id="vote-label">☠️ <span id="vc-count">0</span> / <span id="vc-thresh">2</span></div>
+  <div class="vc-seg kill">☠️ <span id="vc-kill">0</span></div>
+  <div class="vc-seg keep">🛡 <span id="vc-keep">0</span></div>
+  <div class="vc-divider"></div>
+  <div class="vc-seg net">
+    <span class="vc-net-label">NET</span><span id="vc-net">0</span>/<span id="vc-thresh">2</span>
+  </div>
 </div>
 
 <div id="verdict-blast">
@@ -75,6 +101,10 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
   <div class="blast-title">KILL SWITCH</div>
   <div class="blast-subtitle">Kill Switch Activated</div>
   <div class="blast-voters" id="blast-voters"></div>
+  <div id="blast-defenders">
+    <div class="defender-label">Shielded in vain by</div>
+    <div class="defender-row" id="defender-row"></div>
+  </div>
 </div>
 
 <script type="module">
@@ -97,46 +127,74 @@ const voteDoc = doc(db, "vote", "current");
 
 let lastFired = false;
 let blastTimer = null;
-let blasting   = false;  // true while overlay is on screen — blocks early dismissal
+let blasting   = false;
+
+function normVote(v) {
+  if (v === true || v === "kill") return "kill";
+  if (v === "keep") return "keep";
+  return null;
+}
 
 onSnapshot(voteDoc, snap => {
   if (!snap.exists()) return;
   const data = snap.data();
-  const count  = Object.values(data.votes || {}).filter(Boolean).length;
+  const votes = data.votes || {};
+
+  let killCount = 0, keepCount = 0;
+  for (const v of Object.values(votes)) {
+    const nv = normVote(v);
+    if (nv === "kill") killCount++;
+    else if (nv === "keep") keepCount++;
+  }
+  const net    = killCount - keepCount;
   const thresh = data.threshold || 2;
   const fired  = data.fired || false;
 
   // Counter badge
-  const counter = document.getElementById("vote-counter");
-  document.getElementById("vc-count").textContent = count;
+  document.getElementById("vc-kill").textContent   = killCount;
+  document.getElementById("vc-keep").textContent   = keepCount;
+  document.getElementById("vc-net").textContent    = net;
   document.getElementById("vc-thresh").textContent = thresh;
-  if (count > 0 && !fired && !blasting) counter.classList.add("visible");
+
+  const counter = document.getElementById("vote-counter");
+  const anyActivity = (killCount + keepCount) > 0;
+  if (anyActivity && !fired && !blasting) counter.classList.add("visible");
   else counter.classList.remove("visible");
 
   // Verdict blast — only trigger once per firing
-  if (fired && !lastFired) triggerBlast(data.voters || []);
-  // Only dismiss via the blastTimer — ignore Firestore resets while blasting
+  if (fired && !lastFired) triggerBlast(data.voters || [], data.defenders || []);
   if (!fired && lastFired && !blasting) dismissBlast();
   lastFired = fired;
 });
 
-function triggerBlast(voters) {
+function triggerBlast(voters, defenders) {
   blasting = true;
-  const blast = document.getElementById("verdict-blast");
+  const blast    = document.getElementById("verdict-blast");
   const votersEl = document.getElementById("blast-voters");
   votersEl.innerHTML = voters.map((v, i) =>
     `<div class="voter-chip" style="animation-delay:${0.3 + i * 0.1}s">⚡ ${esc(v)}</div>`
   ).join("");
+
+  const defendersWrap = document.getElementById("blast-defenders");
+  const defendersRow  = document.getElementById("defender-row");
+  if (defenders.length) {
+    defendersRow.innerHTML = defenders.map((v, i) =>
+      `<div class="defender-chip" style="animation-delay:${0.6 + i * 0.1}s">🛡 ${esc(v)}</div>`
+    ).join("");
+    defendersWrap.classList.add("show");
+  } else {
+    defendersWrap.classList.remove("show");
+  }
+
   blast.className = "active";
-  // Play sound
   const snd = new Audio("https://joncohenmusic.github.io/bingo/verdict.mp3");
   snd.play().catch(() => {});
-  // Reset Firestore after 3s so scene-switching doesn't re-trigger
+  // Reset Firestore after 3s
   setTimeout(() => {
-    updateDoc(voteDoc, { fired: false, votes: {}, voters: [] }).catch(() => {});
+    updateDoc(voteDoc, { fired: false, votes: {}, voters: [], defenders: [] }).catch(() => {});
   }, 3000);
   if (blastTimer) clearTimeout(blastTimer);
-  blastTimer = setTimeout(dismissBlast, 10000);  // overlay stays for 10s
+  blastTimer = setTimeout(dismissBlast, 10000);
 }
 
 function dismissBlast() {

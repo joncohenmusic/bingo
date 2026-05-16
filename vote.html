@@ -10,6 +10,7 @@
   --bg:#08080f;--panel:#12122a;
   --gold:#e8b84b;--gold-dim:rgba(232,184,75,.15);--gold-border:rgba(232,184,75,.35);
   --red:#ff2d55;--red-dim:rgba(255,45,85,.12);--red-border:rgba(255,45,85,.4);
+  --keep:#3dd68c;--keep-dim:rgba(61,214,140,.12);--keep-border:rgba(61,214,140,.4);
   --green:#39ff14;--green-dim:rgba(57,255,20,.1);--green-border:rgba(57,255,20,.35);
   --text:#f0f0ff;--text-dim:#8888aa;
 }
@@ -25,14 +26,22 @@ label{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text-dim);di
 select{width:100%;background:#0d0d22;border:1px solid var(--gold-border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;}
 select:focus{border-color:var(--gold);}
 .btn-vote{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;border:2px solid;transition:all .2s;margin-bottom:10px;font-family:inherit;}
-.btn-vote.kick{background:var(--red-dim);border-color:var(--red);color:var(--red);}
-.btn-vote.kick:hover:not(:disabled){background:var(--red);color:#fff;}
-.btn-vote.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;}
+.btn-vote.kill{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+.btn-vote.kill:hover:not(:disabled){background:var(--red);color:#fff;}
+.btn-vote.keep{background:var(--keep-dim);border-color:var(--keep);color:var(--keep);}
+.btn-vote.keep:hover:not(:disabled){background:var(--keep);color:#062818;}
+.btn-vote.active{opacity:.5;cursor:default;}
+.btn-vote.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;margin-top:8px;}
 .btn-vote.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
-.btn-vote:disabled{opacity:.35;cursor:not-allowed;}
-.status-box{margin-top:20px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
-.status-box.voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
-.status-box.withdrawn{background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);display:block;}
+.btn-vote:disabled{cursor:not-allowed;}
+.live-tally{display:flex;justify-content:center;gap:14px;font-size:11px;letter-spacing:1px;color:var(--text-dim);margin:14px 0 4px;font-weight:600;}
+.live-tally .seg{display:flex;align-items:center;gap:5px;}
+.live-tally .seg.kill{color:var(--red);}
+.live-tally .seg.keep{color:var(--keep);}
+.live-tally .seg.net{color:var(--gold);}
+.status-box{margin-top:16px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
+.status-box.kill-voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
+.status-box.keep-voted{background:var(--keep-dim);border:1px solid var(--keep-border);color:var(--keep);display:block;}
 .status-box.fired{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);display:block;}
 .hint{font-size:11px;color:var(--text-dim);margin-top:14px;line-height:1.6;}
 .loading{color:var(--text-dim);font-size:13px;padding:20px 0;}
@@ -40,7 +49,7 @@ select:focus{border-color:var(--gold);}
 </head>
 <body>
 <div class="card">
-  <div class="crown">☠️</div>
+  <div class="crown">⚖️</div>
   <h1>THE KILL SWITCH</h1>
   <div class="subtitle">INNER CIRCLE · EYES ONLY</div>
 
@@ -56,16 +65,24 @@ select:focus{border-color:var(--gold);}
       </select>
     </div>
 
-    <button class="btn-vote kick" id="btnVote" onclick="castVote()">🔴 ACTIVATE KILL SWITCH</button>
+    <button class="btn-vote kill" id="btnKill" onclick="castVote('kill')">☠️ ACTIVATE KILL SWITCH</button>
+    <button class="btn-vote keep" id="btnKeep" onclick="castVote('keep')">🛡 SHIELD THIS CALLER</button>
+
+    <div class="live-tally" id="liveTally" style="display:none">
+      <span class="seg kill">☠️ <span id="lt-kill">0</span></span>
+      <span class="seg keep">🛡 <span id="lt-keep">0</span></span>
+      <span class="seg net">NET <span id="lt-net">0</span>/<span id="lt-thresh">2</span></span>
+    </div>
+
     <button class="btn-vote withdraw" id="btnWithdraw" onclick="withdrawVote()" style="display:none">↩ Withdraw vote</button>
     <div class="status-box" id="statusBox"></div>
-    <p class="hint" id="hintText">Your vote is anonymous until the Kill Switch fires.</p>
+    <p class="hint" id="hintText">Each SHIELD cancels one KILL. Verdict fires when net kills hit threshold.</p>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc }
+import { getFirestore, doc, onSnapshot, setDoc, getDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -82,6 +99,22 @@ const db  = getFirestore(app);
 const voteDoc    = doc(db, "vote", "current");
 const membersRef = doc(db, "config", "innerCircle");
 
+// ── Vote normalisation (legacy `true` == "kill") ──
+function normVote(v) {
+  if (v === true || v === "kill") return "kill";
+  if (v === "keep") return "keep";
+  return null;
+}
+function tallyVotes(votes) {
+  const killers = [], keepers = [];
+  for (const [name, v] of Object.entries(votes || {})) {
+    const nv = normVote(v);
+    if (nv === "kill") killers.push(name);
+    else if (nv === "keep") keepers.push(name);
+  }
+  return { killers, keepers, net: killers.length - keepers.length };
+}
+
 // ── Load member list dynamically ──
 async function loadMembers() {
   try {
@@ -95,7 +128,6 @@ async function loadMembers() {
       opt.textContent = m;
       sel.appendChild(opt);
     });
-    // Restore saved selection
     const saved = localStorage.getItem("ic_member");
     if (saved && members.includes(saved)) sel.value = saved;
     if (!members.length) {
@@ -107,16 +139,18 @@ async function loadMembers() {
 }
 loadMembers();
 
-let myVote = false;
+let myVote = null;             // "kill" | "keep" | null
 let currentState = {};
 let memberName = localStorage.getItem("ic_member") || "";
 
-// ── Restore saved name ──
 const sel = document.getElementById("memberSelect");
 if (memberName) sel.value = memberName;
 sel.addEventListener("change", () => {
   memberName = sel.value;
   if (memberName) localStorage.setItem("ic_member", memberName);
+  // Re-evaluate my vote against the new identity
+  myVote = normVote((currentState.votes || {})[memberName]);
+  renderVoteState();
 });
 
 // ── Listen to Firestore ──
@@ -138,44 +172,55 @@ onSnapshot(voteDoc, snap => {
     callerBar.innerHTML = "";
   }
 
-  // Hint with threshold
+  const thresh = currentState.threshold || 2;
+  const { killers, keepers, net } = tallyVotes(currentState.votes);
+
+  // Live tally pills
+  document.getElementById("lt-kill").textContent   = killers.length;
+  document.getElementById("lt-keep").textContent   = keepers.length;
+  document.getElementById("lt-net").textContent    = net;
+  document.getElementById("lt-thresh").textContent = thresh;
+  document.getElementById("liveTally").style.display =
+    (killers.length || keepers.length) ? "flex" : "none";
+
+  // Hint
   document.getElementById("hintText").textContent =
-    `Threshold: ${currentState.threshold} votes. Your vote is anonymous until the verdict fires.`;
+    `Each 🛡 cancels one ☠️. Verdict fires at net ${thresh}.`;
 
   // Reflect my vote state from Firestore (survives refresh)
-  const votes = currentState.votes || {};
-  myVote = !!(memberName && votes[memberName]);
+  myVote = normVote(memberName ? (currentState.votes || {})[memberName] : null);
 
-  if (currentState.fired) {
-    showFired();
-  } else {
-    renderVoteState();
-  }
+  if (currentState.fired) showFired();
+  else renderVoteState();
 });
 
 // ── Actions ──
-async function castVote() {
+async function castVote(kind) {
   memberName = sel.value;
   if (!memberName) { alert("Please select your name first."); return; }
   localStorage.setItem("ic_member", memberName);
 
   const snap = await getDoc(voteDoc);
   const data = snap.exists() ? snap.data() : { votes: {}, threshold: 2, fired: false };
-  const votes = data.votes || {};
-  votes[memberName] = true;
+  const votes = { ...(data.votes || {}) };
+  votes[memberName] = kind;
 
-  // Check if this triggers the verdict
-  const activeVoters = Object.keys(votes).filter(k => votes[k]);
-  const fired = activeVoters.length >= (data.threshold || 2);
+  const { killers, keepers, net } = tallyVotes(votes);
+  const thresh = data.threshold || 2;
+  const shouldFire = net >= thresh;
+  // Once fired, stay fired until overlay resets — keep votes can't un-fire
+  const newFired = data.fired || shouldFire;
+  const firingNow = shouldFire && !data.fired;
 
   await setDoc(voteDoc, {
     ...data,
     votes,
-    fired,
-    voters: fired ? activeVoters : (data.voters || [])
+    fired: newFired,
+    voters:    firingNow ? killers : (data.voters    || []),
+    defenders: firingNow ? keepers : (data.defenders || [])
   }, { merge: true });
 
-  myVote = true;
+  myVote = kind;
 }
 
 async function withdrawVote() {
@@ -189,34 +234,52 @@ async function withdrawVote() {
   delete votes[memberName];
 
   await setDoc(voteDoc, { ...data, votes }, { merge: true });
-  myVote = false;
+  myVote = null;
 }
 
 // ── UI helpers ──
 function renderVoteState() {
-  const btnVote = document.getElementById("btnVote");
+  const btnKill = document.getElementById("btnKill");
+  const btnKeep = document.getElementById("btnKeep");
   const btnWith = document.getElementById("btnWithdraw");
   const box     = document.getElementById("statusBox");
 
-  if (myVote) {
-    box.className = "status-box voted";
-    box.textContent = "✊ Vote cast. Waiting for others...";
-    btnVote.disabled = true;
+  btnKill.classList.remove("active");
+  btnKeep.classList.remove("active");
+  btnKill.disabled = false;
+  btnKeep.disabled = false;
+
+  if (myVote === "kill") {
+    btnKill.classList.add("active");
+    btnKill.disabled = true;
+    box.className = "status-box kill-voted";
+    box.textContent = "☠️ KILL vote cast. Tap SHIELD to switch, or withdraw.";
+    btnWith.style.display = "block";
+  } else if (myVote === "keep") {
+    btnKeep.classList.add("active");
+    btnKeep.disabled = true;
+    box.className = "status-box keep-voted";
+    box.textContent = "🛡 SHIELD vote cast. Tap KILL to switch, or withdraw.";
     btnWith.style.display = "block";
   } else {
     box.className = "status-box";
     box.style.display = "none";
-    btnVote.disabled = false;
     btnWith.style.display = "none";
   }
 }
 
 function showFired() {
-  const voters = currentState.voters || [];
+  const voters    = currentState.voters    || [];
+  const defenders = currentState.defenders || [];
   const box = document.getElementById("statusBox");
   box.className = "status-box fired";
-  box.innerHTML = "☠️ KILL SWITCH ACTIVATED<br><small>" + voters.map(esc).join(", ") + "</small>";
-  document.getElementById("btnVote").disabled = true;
+  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(esc).join(", ") + "</small>";
+  if (defenders.length) {
+    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(esc).join(", ") + "</small>";
+  }
+  box.innerHTML = html;
+  document.getElementById("btnKill").disabled = true;
+  document.getElementById("btnKeep").disabled = true;
   document.getElementById("btnWithdraw").style.display = "none";
 }
 
@@ -226,8 +289,7 @@ function esc(str) {
   return d.innerHTML;
 }
 
-// Expose to onclick handlers
-window.castVote    = castVote;
+window.castVote     = castVote;
 window.withdrawVote = withdrawVote;
 </script>
 </body>
