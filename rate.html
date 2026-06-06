@@ -177,8 +177,8 @@ body {
   max-width: min(92vw, calc(100vh - 280px));
   aspect-ratio: 1 / 1;
   background:
-    linear-gradient(135deg, var(--tint-shifty) 0%, transparent 50%, var(--tint-sincere) 100%),
-    linear-gradient(45deg, var(--tint-troll) 0%, transparent 50%, var(--tint-genuine) 100%),
+    linear-gradient(90deg, var(--tint-troll) 0 19%, var(--tint-shifty) 19% 50%, transparent 50%),
+    linear-gradient(180deg, var(--tint-genuine) 0 50%, var(--tint-sincere) 50% 100%) 100% 0 / 50% 100% no-repeat,
     var(--surface);
   border: 1px solid rgba(232,184,75,0.18);
   border-radius: 14px;
@@ -261,11 +261,21 @@ body {
   z-index: 1;
 }
 .q-genuine { top: 14%; right: 9%; }
-.q-shifty  { top: 14%; left: 9%; }
+.q-shifty  { top: 50%; left: 34%; transform: translate(-50%, -50%); }
 .q-sincere { bottom: 14%; right: 9%; }
-.q-troll   { bottom: 14%; left: 9%; }
+.q-troll   { top: 50%; left: 13%; transform: translate(-50%, -50%) rotate(-90deg); }
 
 /* Origin marker */
+.troll-line {
+  position: absolute;
+  top: 6%; bottom: 6%;
+  left: 19.2%;
+  width: 2px;
+  background: rgba(255,45,85,0.45);
+  box-shadow: 0 0 10px rgba(255,45,85,0.4);
+  pointer-events: none;
+  z-index: 2;
+}
 .origin-marker {
   position: absolute;
   top: 50%; left: 50%;
@@ -435,9 +445,9 @@ body {
   border-radius: 14px;
 }
 .q-genuine-tint { top: 0;    right: 0;  background: radial-gradient(circle at top right,    rgba(57,255,20,0.22),  transparent 70%); }
-.q-shifty-tint  { top: 0;    left: 0;   background: radial-gradient(circle at top left,     rgba(255,160,30,0.22), transparent 70%); }
+.q-shifty-tint  { top: 0;    left: 19%; width: 31%; height: 100%; background: linear-gradient(90deg, rgba(255,160,30,0.24), transparent); }
 .q-sincere-tint { bottom: 0; right: 0;  background: radial-gradient(circle at bottom right, rgba(108,155,255,0.22),transparent 70%); }
-.q-troll-tint   { bottom: 0; left: 0;   background: radial-gradient(circle at bottom left,  rgba(255,45,85,0.22),  transparent 70%); }
+.q-troll-tint   { top: 0;    left: 0;   width: 19%; height: 100%; background: linear-gradient(90deg, rgba(255,45,85,0.30), transparent); border-radius: 14px 0 0 14px; }
 
 .plot.lit-genuine .q-genuine-tint,
 .plot.lit-shifty  .q-shifty-tint,
@@ -682,6 +692,7 @@ body.sandbox .sandbox-banner { display: block; }
 <div class="plot-wrap">
   <div class="plot" id="plot">
     <div class="plot-grid"></div>
+    <div class="troll-line"></div>
     <div class="axis-label axis-substance-top">SUBSTANCE +</div>
     <div class="axis-label axis-substance-bot">SUBSTANCE −</div>
     <div class="axis-label axis-faith-left">GOOD FAITH −</div>
@@ -775,11 +786,15 @@ const lockedSubEl       = document.getElementById("locked-sub");
 // Latest aggregate — needed when the lock fires to populate the verdict display
 let lastAgg = { sub: 0, gf: 0, count: 0 };
 
+// Good-faith axis (gf) maps to 0-100 via (gf + 10) * 5.
+// TROLL only for genuinely bad faith: score < 15  →  gf < -7.
+const TROLL_FAITH_AXIS = -7;   // good faith score 15
+
 function quadrantFor(sub, gf) {
-  if (sub >= 0 && gf >= 0) return { key: "genuine", label: "Genuine" };
-  if (sub >= 0 && gf <  0) return { key: "shifty",  label: "Shifty"  };
-  if (sub <  0 && gf >= 0) return { key: "sincere", label: "Sincere" };
-  return                          { key: "troll",   label: "Troll"   };
+  if (gf < TROLL_FAITH_AXIS) return { key: "troll",   label: "Troll"   };
+  if (gf < 0)                return { key: "shifty",  label: "Shifty"  };
+  if (sub >= 0)              return { key: "genuine", label: "Genuine" };
+  return                            { key: "sincere", label: "Sincere" };
 }
 const toScore100 = v => Math.max(0, Math.min(100, Math.round((v + 10) * 5)));
 

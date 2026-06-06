@@ -170,8 +170,8 @@ body {
   width: 100%;
   aspect-ratio: 1 / 1;
   background:
-    linear-gradient(135deg, var(--tint-shifty) 0%, transparent 50%, var(--tint-sincere) 100%),
-    linear-gradient(45deg,  var(--tint-troll)  0%, transparent 50%, var(--tint-genuine)  100%),
+    linear-gradient(90deg, var(--tint-troll) 0 19%, var(--tint-shifty) 19% 50%, transparent 50%),
+    linear-gradient(180deg, var(--tint-genuine) 0 50%, var(--tint-sincere) 50% 100%) 100% 0 / 50% 100% no-repeat,
     rgba(0,0,0,0.35);
   border: 1px solid rgba(232,184,75,0.22);
   border-radius: 16px;
@@ -255,9 +255,21 @@ body {
   z-index: 1;
 }
 .q-genuine { top: 11%; right: 8%; }
-.q-shifty  { top: 11%; left: 8%; }
+.q-shifty  { top: 50%; left: 34%; transform: translate(-50%, -50%); }
 .q-sincere { bottom: 11%; right: 8%; }
-.q-troll   { bottom: 11%; left: 8%; }
+.q-troll   { top: 50%; left: 12.5%; transform: translate(-50%, -50%) rotate(-90deg); }
+
+/* Threshold line: good faith score = 15 (axis -7) */
+.troll-line {
+  position: absolute;
+  top: 6%; bottom: 6%;
+  left: 19.2%;
+  width: 2px;
+  background: rgba(255,45,85,0.5);
+  box-shadow: 0 0 12px rgba(255,45,85,0.45);
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* Aggregate dot */
 .agg-dot {
@@ -475,6 +487,7 @@ body {
   <div class="plot-wrap">
     <div class="plot" id="plot">
       <div class="quarter-grid"></div>
+      <div class="troll-line"></div>
       <div class="axis-label axis-substance-top">SUBSTANCE +</div>
       <div class="axis-label axis-substance-bot">SUBSTANCE −</div>
       <div class="axis-label axis-faith-left">GOOD FAITH −</div>
@@ -559,14 +572,17 @@ function computeScore(goodFaith, substance) {
   return Math.round(((goodFaith + substance) + 20) * 2.5);
 }
 
+// Good-faith axis (x) maps to a 0-100 score via (x + 10) * 5.
+// TROLL is reserved for genuinely bad faith only: score < 15  →  x < -7.
+const TROLL_FAITH_AXIS = -7;   // good faith score 15
+
 function quadrantLabel(x, y) {
   // x = goodFaith axis, y = substance axis
   const NEAR = 1.0; // dead zone around origin
   if (Math.abs(x) < NEAR && Math.abs(y) < NEAR) return "UNDECIDED";
-  if (y >= 0 && x >= 0) return "GENUINE";
-  if (y >= 0 && x <  0) return "SHIFTY";
-  if (y <  0 && x >= 0) return "SINCERE";
-  return "TROLL";
+  if (x < TROLL_FAITH_AXIS) return "TROLL";   // faith score < 15, substance ignored
+  if (x < 0)               return "SHIFTY";   // faith score 15-50, substance ignored
+  return y >= 0 ? "GENUINE" : "SINCERE";       // faith ok → substance decides
 }
 
 function showCard() {
