@@ -271,6 +271,31 @@ body {
   z-index: 2;
 }
 
+/* Swarm: one dot per live voter */
+.swarm-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.swarm-dot {
+  position: absolute;
+  width: 18px; height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,236,180,0.95), rgba(232,184,75,0.7) 70%);
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 0 8px rgba(232,184,75,0.5);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    left 0.45s cubic-bezier(0.22,1,0.36,1),
+    top  0.45s cubic-bezier(0.22,1,0.36,1),
+    opacity 0.3s ease, transform 0.3s ease;
+  will-change: left, top;
+}
+.swarm-dot.show { opacity: 0.8; transform: scale(1); }
+
 /* Aggregate dot */
 .agg-dot {
   position: absolute;
@@ -498,6 +523,7 @@ body {
       <div class="quadrant-label q-troll">TROLL</div>
       <div class="origin-marker"></div>
       <div class="empty-hint" id="empty-hint">Awaiting first vote…</div>
+      <div class="swarm-layer" id="swarm-layer"></div>
       <div class="agg-dot" id="agg-dot"></div>
       <div class="final-overlay" id="final-overlay">
         <div class="final-stamp">FINAL VERDICT</div>
@@ -556,6 +582,38 @@ const finalOL     = document.getElementById("final-overlay");
 const verdictVal  = document.getElementById("verdict-value");
 const scoreVal    = document.getElementById("score-value");
 const plot        = document.getElementById("plot");
+
+// ── Swarm: one dot per live voter ──────────────────────
+const swarmLayer = document.getElementById("swarm-layer");
+const swarmDots  = new Map(); // voterId -> element
+
+function upsertSwarmDot(id, gf, sub) {
+  const leftPct = axisToPctX(gf) + "%";
+  const topPct  = axisToPctY(sub) + "%";
+  let el = swarmDots.get(id);
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "swarm-dot";
+    el.style.left = leftPct;
+    el.style.top  = topPct;
+    swarmLayer.appendChild(el);
+    swarmDots.set(id, el);
+    requestAnimationFrame(() => el.classList.add("show"));
+  } else {
+    el.style.left = leftPct;
+    el.style.top  = topPct;
+  }
+}
+function removeSwarmDot(id) {
+  const el = swarmDots.get(id);
+  if (!el) return;
+  swarmDots.delete(id);
+  el.classList.remove("show");
+  setTimeout(() => el.remove(), 340);
+}
+function clearSwarm() {
+  swarmDots.forEach((_, id) => removeSwarmDot(id));
+}
 
 function axisToPctX(x) {
   const half = (50 - PLOT_PADDING_PCT);
@@ -629,9 +687,11 @@ onSnapshot(votesRef, snap => {
     verdictVal.textContent = "—";
     scoreVal.textContent = "—";
     scoreVal.classList.add("empty");
+    clearSwarm();
     return;
   }
   let sx = 0, sy = 0, n = 0;
+  const seen = new Set();
   snap.forEach(d => {
     const v = d.data();
     if (v.sessionId !== currentSessionId) return;
@@ -639,7 +699,10 @@ onSnapshot(votesRef, snap => {
     sx += v.goodFaith;
     sy += v.substance;
     n++;
+    seen.add(d.id);
+    upsertSwarmDot(d.id, v.goodFaith, v.substance);
   });
+  swarmDots.forEach((_, id) => { if (!seen.has(id)) removeSwarmDot(id); });
   countNum.textContent = String(n);
 
   if (n === 0) {
