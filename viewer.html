@@ -30,18 +30,20 @@ body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-
 .score-item span{color:var(--neon-blue);font-size:20px;font-family:'Bangers',cursive;letter-spacing:2px;}
 .bingo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;width:100%;background:linear-gradient(135deg,rgba(255,45,85,.08),rgba(0,212,255,.08));border:2px solid rgba(255,45,85,.3);border-radius:18px;box-shadow:0 0 30px rgba(255,45,85,.12),0 0 60px rgba(0,212,255,.08),inset 0 0 30px rgba(0,0,0,.3);}
 .cell{aspect-ratio:4/3;background:var(--cell-bg);border:1px solid rgba(255,255,255,.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px 6px;cursor:pointer;transition:all .2s ease;position:relative;overflow:hidden;user-select:none;}
-.cell-text{font-size:clamp(14px,3vw,18px);font-weight:600;line-height:1.3;color:var(--text);}
-.cell-caller{font-size:clamp(12px,2.2vw,15px);color:var(--neon-yellow);margin-top:4px;font-weight:700;letter-spacing:.5px;}
-.cell-pending-label{font-size:clamp(11px,2vw,13px);color:var(--neon-yellow);margin-top:3px;opacity:.85;}
+.cell-text{font-size:clamp(9px,2.3vw,15px);font-weight:600;line-height:1.2;color:var(--text);overflow-wrap:anywhere;hyphens:auto;}
+.cell-caller{font-size:clamp(9px,1.9vw,13px);color:var(--neon-yellow);margin-top:3px;font-weight:700;letter-spacing:.3px;overflow-wrap:anywhere;}
+.cell-pending-label{font-size:clamp(8px,1.7vw,12px);color:var(--neon-yellow);margin-top:2px;opacity:.85;}
 .cell:hover:not(.marked):not(.pending):not(.free-space){background:var(--cell-hover);border-color:rgba(0,212,255,.3);transform:scale(1.03);box-shadow:0 0 15px rgba(0,212,255,.2);}
 .cell.marked{background:linear-gradient(135deg,var(--neon-pink),#cc1144);border-color:var(--neon-pink);box-shadow:0 0 20px rgba(255,45,85,.5),0 0 40px rgba(255,45,85,.2),inset 0 0 15px rgba(255,255,255,.1);animation:markPop .4s cubic-bezier(.175,.885,.32,1.275);cursor:default;}
 .cell.marked .cell-text{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);}
 .cell.marked::after{content:'✓';position:absolute;top:5px;right:7px;font-size:14px;opacity:.8;}
 @keyframes markPop{0%{transform:scale(.8)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
 .cell.pending{border-color:rgba(255,230,0,.7);cursor:default;animation:pendingPulse 1.5s ease-in-out infinite;}
+.cell.pending.mine{cursor:pointer;}
+.cell.pending.mine:hover{box-shadow:0 0 22px rgba(255,230,0,.55),0 0 42px rgba(255,45,85,.22);}
 @keyframes pendingPulse{0%,100%{box-shadow:0 0 8px rgba(255,230,0,.2);border-color:rgba(255,230,0,.5);}50%{box-shadow:0 0 20px rgba(255,230,0,.5),0 0 35px rgba(255,230,0,.2);border-color:rgba(255,230,0,.9);}}
 .cell.free-space{background:linear-gradient(135deg,#2a1a0a,#3d1a00);border-color:rgba(255,100,0,.4);cursor:default;}
-.cell.free-space .cell-text{font-family:'Bangers',cursive;font-size:clamp(17px,3.4vw,22px);letter-spacing:2px;color:#ff6600;text-shadow:0 0 10px rgba(255,100,0,.5);}
+.cell.free-space .cell-text{font-family:'Bangers',cursive;font-size:clamp(11px,2.6vw,18px);letter-spacing:1px;color:#ff6600;text-shadow:0 0 10px rgba(255,100,0,.5);}
 .cell.win-highlight{animation:winPulse .6s ease infinite alternate;box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3),inset 0 0 15px rgba(255,215,0,.2);border-color:var(--gold)!important;}
 @keyframes winPulse{from{box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3);}to{box-shadow:0 0 35px rgba(255,215,0,.8),0 0 70px rgba(255,215,0,.5);}}
 .status-msg{font-size:12px;color:var(--neon-green);text-align:center;min-height:18px;transition:opacity .5s;letter-spacing:1px;}
@@ -81,7 +83,7 @@ body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, serverTimestamp }
+import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -167,7 +169,7 @@ function startListening() {
   });
   onSnapshot(collection(db,'games','current','pending'), function(snap) {
     pendingCells = {};
-    snap.forEach(function(d){ pendingCells[d.data().cellIndex] = d.id; });
+    snap.forEach(function(d){ pendingCells[d.data().cellIndex] = { id: d.id, username: d.data().username || '' }; });
     initialLoad = false;
     buildBoard();
   });
@@ -199,7 +201,15 @@ function buildBoard() {
       cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-caller">@'+esc(caller.replace(/^@/,''))+'</span>';
     } else if (isPend) {
       cell.classList.add('pending');
-      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting approval</span>';
+      const pendUser = (pendingCells[i].username || '').toLowerCase();
+      const mine = pendUser === username.toLowerCase();
+      if (mine) {
+        cell.classList.add('mine');
+        cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting — tap to cancel</span>';
+        cell.addEventListener('click', (function(idx){return function(){withdrawCell(idx);};})(i));
+      } else {
+        cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting approval</span>';
+      }
     } else {
       cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span>';
       cell.addEventListener('click', (function(idx,t){return function(){submitCell(idx,t);};})(i,text));
@@ -208,6 +218,7 @@ function buildBoard() {
     grid.appendChild(cell);
   }
   updateScore();
+  requestAnimationFrame(fitCellText);
 }
 
 async function submitCell(gridIndex, text) {
@@ -230,6 +241,32 @@ async function submitCell(gridIndex, text) {
     } catch(e) { showStatus('⚠️ Connection error — try again'); }
   }
 }
+
+async function withdrawCell(gridIndex) {
+  const pend = pendingCells[gridIndex];
+  if (!pend || (pend.username||'').toLowerCase() !== username.toLowerCase()) return;
+  try {
+    await deleteDoc(doc(db,'games','current','pending', pend.id));
+    showStatus('Call withdrawn ↩');
+  } catch(e) { showStatus('⚠️ Couldn\'t withdraw — try again'); }
+}
+
+// Auto-shrink each cell's text until it fits, so long labels never clip on a 5x5 board
+function fitCellText() {
+  document.querySelectorAll('.bingo-grid .cell').forEach(function(cell){
+    const txt = cell.querySelector('.cell-text');
+    if (!txt) return;
+    txt.style.fontSize = '';
+    const cs = getComputedStyle(cell);
+    const avail = cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    function contentH(){ let h=0; cell.querySelectorAll(':scope > *').forEach(function(el){ h += el.getBoundingClientRect().height; }); return h; }
+    let size = parseFloat(getComputedStyle(txt).fontSize), guard = 60;
+    while (guard-- > 0 && contentH() > avail && size > 7) { size -= 0.5; txt.style.fontSize = size + 'px'; }
+  });
+}
+let _fitRaf;
+window.addEventListener('resize', function(){ cancelAnimationFrame(_fitRaf); _fitRaf = requestAnimationFrame(fitCellText); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ requestAnimationFrame(fitCellText); });
 
 function showStatus(msg) {
   const el = document.getElementById('statusMsg');
