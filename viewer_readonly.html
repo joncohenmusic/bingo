@@ -173,16 +173,30 @@ function buildBoard() {
 }
 
 // Auto-shrink each cell's text until it fits, so long labels never clip on a 5x5 board
-function fitCellText() {
-  document.querySelectorAll('.bingo-grid .cell').forEach(function(cell){
-    const txt = cell.querySelector('.cell-text');
-    if (!txt) return;
-    txt.style.fontSize = '';
-    const cs = getComputedStyle(cell);
-    const avail = cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    function contentH(){ let h=0; cell.querySelectorAll(':scope > *').forEach(function(el){ h += el.getBoundingClientRect().height; }); return h; }
-    let size = parseFloat(getComputedStyle(txt).fontSize), guard = 60;
-    while (guard-- > 0 && contentH() > avail && size > 7) { size -= 0.5; txt.style.fontSize = size + 'px'; }
+function fitCellText(){
+  document.querySelectorAll(".cell").forEach(function(cell){
+    const txt=cell.querySelector(".cell-text"); if(!txt) return;
+    const extras=cell.querySelectorAll(".cell-caller,.cell-pend-label,.cell-pending-label");
+    txt.style.fontSize=""; extras.forEach(function(e){e.style.fontSize="";});
+    const cs=getComputedStyle(cell);
+    const availH=cell.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+    const availW=cell.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    if(!(availH>0)||!(availW>0)) return;
+    function contentH(){let h=0;cell.querySelectorAll(":scope > *").forEach(function(el){h+=el.getBoundingClientRect().height;});return h;}
+    function tooWide(el){return el.scrollWidth>Math.ceil(availW)+1;}
+    // Shrink the square text until it fits both vertically and horizontally
+    let size=parseFloat(getComputedStyle(txt).fontSize),guard=90;
+    while(guard-->0 && size>6 && (contentH()>availH || tooWide(txt))){size-=0.5;txt.style.fontSize=size+"px";}
+    // Then shrink caller/pending lines if they still push it over
+    guard=60;
+    while(guard-->0 && extras.length){
+      let over=contentH()>availH;
+      extras.forEach(function(e){ if(tooWide(e)) over=true; });
+      if(!over) break;
+      let shrunk=false;
+      extras.forEach(function(e){let v=parseFloat(getComputedStyle(e).fontSize);if(v>6){e.style.fontSize=(v-0.5)+"px";shrunk=true;}});
+      if(!shrunk) break;
+    }
   });
 }
 let _fitRaf;
