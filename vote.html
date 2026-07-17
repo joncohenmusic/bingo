@@ -21,6 +21,7 @@ h1{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bo
 .subtitle{font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:28px;}
 .caller-bar{min-height:22px;margin-bottom:20px;}
 .caller-name{color:var(--gold);font-size:12px;letter-spacing:1px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px;display:inline-block;}
+.caller-name.none{color:var(--text-dim);background:rgba(136,136,170,.08);border-color:rgba(136,136,170,.25);}
 .select-wrap{margin-bottom:24px;text-align:left;}
 label{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text-dim);display:block;margin-bottom:8px;}
 select{width:100%;background:#0d0d22;border:1px solid var(--gold-border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;}
@@ -31,6 +32,7 @@ select:focus{border-color:var(--gold);}
 .btn-vote.keep{background:var(--keep-dim);border-color:var(--keep);color:var(--keep);}
 .btn-vote.keep:hover:not(:disabled){background:var(--keep);color:#062818;}
 .btn-vote.active{opacity:.5;cursor:default;}
+.btn-vote.idle{opacity:.3;filter:grayscale(1);}
 .btn-vote.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;margin-top:8px;}
 .btn-vote.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
 .btn-vote:disabled{cursor:not-allowed;}
@@ -39,22 +41,11 @@ select:focus{border-color:var(--gold);}
 .live-tally .seg.kill{color:var(--red);}
 .live-tally .seg.keep{color:var(--keep);}
 .live-tally .seg.net{color:var(--gold);}
-
-/* ── Anonymity toggle ── */
-.anon-row{margin:0 0 16px;display:flex;justify-content:center;}
-.anon-toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:8px 14px;border-radius:10px;background:#0d0d22;border:1px solid var(--gold-border);transition:all .2s;}
-.anon-toggle:hover{border-color:var(--gold);}
-.anon-toggle input{position:absolute;opacity:0;width:0;height:0;}
-.anon-track{position:relative;width:34px;height:18px;background:#1a1a30;border:1px solid rgba(232,184,75,.25);border-radius:11px;flex-shrink:0;transition:all .2s;}
-.anon-thumb{position:absolute;top:1px;left:1px;width:14px;height:14px;background:var(--text-dim);border-radius:50%;transition:all .25s cubic-bezier(.4,1,.6,1);}
-.anon-toggle input:checked + .anon-track{background:var(--gold-dim);border-color:var(--gold);}
-.anon-toggle input:checked + .anon-track .anon-thumb{left:18px;background:var(--gold);box-shadow:0 0 8px var(--gold);}
-.anon-label{font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-dim);transition:color .2s;}
-.anon-toggle input:checked ~ .anon-label{color:var(--gold);}
 .status-box{margin-top:16px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
 .status-box.kill-voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
 .status-box.keep-voted{background:var(--keep-dim);border:1px solid var(--keep-border);color:var(--keep);display:block;}
 .status-box.fired{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);display:block;}
+.status-box.waiting{background:rgba(136,136,170,.08);border:1px solid rgba(136,136,170,.3);color:var(--text-dim);display:block;}
 .hint{font-size:11px;color:var(--text-dim);margin-top:14px;line-height:1.6;}
 .loading{color:var(--text-dim);font-size:13px;padding:20px 0;}
 </style>
@@ -75,14 +66,6 @@ select:focus{border-color:var(--gold);}
       <select id="memberSelect">
         <option value="">Loading members...</option>
       </select>
-    </div>
-
-    <div class="anon-row">
-      <label class="anon-toggle">
-        <input type="checkbox" id="anonToggle">
-        <span class="anon-track"><span class="anon-thumb"></span></span>
-        <span class="anon-label" id="anonLabel">🎭 Hide my identity on stream</span>
-      </label>
     </div>
 
     <button class="btn-vote kill" id="btnKill" onclick="castVote('kill')">☠️ ACTIVATE KILL SWITCH</button>
@@ -119,26 +102,30 @@ const db  = getFirestore(app);
 const voteDoc    = doc(db, "vote", "current");
 const membersRef = doc(db, "config", "innerCircle");
 
-// ── Vote normalisation (handles all legacy + new shapes) ──
-// Returns { kind: "kill"|"keep", anon: bool } or null
+// ── Is anyone actually on screen? ──
+// The caller log writes "Caller Name" as a placeholder when the overlay is
+// cleared or Reset Stream runs, and the field is null on a fresh doc. Neither
+// counts as a live caller, so voting stays shut in both cases.
+const PLACEHOLDER_CALLER = "Caller Name";
+function hasActiveCaller(state) {
+  const c = ((state && state.caller) || "").trim();
+  return !!c && c !== PLACEHOLDER_CALLER;
+}
+
+// ── Vote normalisation (legacy `true` == "kill") ──
 function normVote(v) {
-  if (v === true || v === "kill") return { kind: "kill", anon: false };
-  if (v === "keep") return { kind: "keep", anon: false };
-  if (v && typeof v === "object" && (v.kind === "kill" || v.kind === "keep")) {
-    return { kind: v.kind, anon: !!v.anon };
-  }
+  if (v === true || v === "kill") return "kill";
+  if (v === "keep") return "keep";
   return null;
 }
 function tallyVotes(votes) {
-  const killers = [], keepers = [], anons = [];
+  const killers = [], keepers = [];
   for (const [name, v] of Object.entries(votes || {})) {
-    const n = normVote(v);
-    if (!n) continue;
-    if (n.kind === "kill") killers.push(name);
-    else if (n.kind === "keep") keepers.push(name);
-    if (n.anon) anons.push(name);
+    const nv = normVote(v);
+    if (nv === "kill") killers.push(name);
+    else if (nv === "keep") keepers.push(name);
   }
-  return { killers, keepers, anons, net: killers.length - keepers.length };
+  return { killers, keepers, net: killers.length - keepers.length };
 }
 
 // ── Load member list dynamically ──
@@ -165,7 +152,7 @@ async function loadMembers() {
 }
 loadMembers();
 
-let myVote = null;             // { kind, anon } | null
+let myVote = null;             // "kill" | "keep" | null
 let currentState = {};
 let memberName = localStorage.getItem("ic_member") || "";
 
@@ -174,24 +161,10 @@ if (memberName) sel.value = memberName;
 sel.addEventListener("change", () => {
   memberName = sel.value;
   if (memberName) localStorage.setItem("ic_member", memberName);
+  // Re-evaluate my vote against the new identity
   myVote = normVote((currentState.votes || {})[memberName]);
   renderVoteState();
 });
-
-// ── Anonymity toggle (sticky preference) ──
-const anonToggle = document.getElementById("anonToggle");
-const anonLabel  = document.getElementById("anonLabel");
-anonToggle.checked = localStorage.getItem("ic_anon") === "true";
-function updateAnonLabel() {
-  anonLabel.textContent = anonToggle.checked
-    ? "🎭 You'll appear as Mystery Member"
-    : "🎭 Hide my identity on stream";
-}
-anonToggle.addEventListener("change", () => {
-  localStorage.setItem("ic_anon", anonToggle.checked);
-  updateAnonLabel();
-});
-updateAnonLabel();
 
 // ── Listen to Firestore ──
 onSnapshot(voteDoc, snap => {
@@ -206,10 +179,10 @@ onSnapshot(voteDoc, snap => {
 
   // Caller bar
   const callerBar = document.getElementById("callerBar");
-  if (currentState.caller) {
+  if (hasActiveCaller(currentState)) {
     callerBar.innerHTML = `<span class="caller-name">📞 ${esc(currentState.caller)}</span>`;
   } else {
-    callerBar.innerHTML = "";
+    callerBar.innerHTML = `<span class="caller-name none">— no caller on screen —</span>`;
   }
 
   const thresh = currentState.threshold || 2;
@@ -224,8 +197,9 @@ onSnapshot(voteDoc, snap => {
     (killers.length || keepers.length) ? "flex" : "none";
 
   // Hint
-  document.getElementById("hintText").textContent =
-    `Each 🛡 cancels one ☠️. Verdict fires at net ${thresh}.`;
+  document.getElementById("hintText").textContent = hasActiveCaller(currentState)
+    ? `Each 🛡 cancels one ☠️. Verdict fires at net ${thresh}.`
+    : `Voting opens when a caller goes on screen.`;
 
   // Reflect my vote state from Firestore (survives refresh)
   myVote = normVote(memberName ? (currentState.votes || {})[memberName] : null);
@@ -240,14 +214,20 @@ async function castVote(kind) {
   if (!memberName) { alert("Please select your name first."); return; }
   localStorage.setItem("ic_member", memberName);
 
-  const anon = anonToggle.checked;
-
   const snap = await getDoc(voteDoc);
   const data = snap.exists() ? snap.data() : { votes: {}, threshold: 2, fired: false };
-  const votes = { ...(data.votes || {}) };
-  votes[memberName] = { kind, anon };
 
-  const { killers, keepers, anons, net } = tallyVotes(votes);
+  // Re-check against fresh server state: the caller may have left between the
+  // tap and this round-trip, in which case the vote would land on nobody.
+  if (!hasActiveCaller(data)) {
+    console.warn("[vote] ignored — no caller on screen");
+    return;
+  }
+
+  const votes = { ...(data.votes || {}) };
+  votes[memberName] = kind;
+
+  const { killers, keepers, net } = tallyVotes(votes);
   const thresh = data.threshold || 2;
   const shouldFire = net >= thresh;
   // Once fired, stay fired until overlay resets — keep votes can't un-fire
@@ -258,12 +238,11 @@ async function castVote(kind) {
     ...data,
     votes,
     fired: newFired,
-    voters:     firingNow ? killers : (data.voters     || []),
-    defenders:  firingNow ? keepers : (data.defenders  || []),
-    anonVoters: firingNow ? anons   : (data.anonVoters || [])
+    voters:    firingNow ? killers : (data.voters    || []),
+    defenders: firingNow ? keepers : (data.defenders || [])
   }, { merge: true });
 
-  myVote = { kind, anon };
+  myVote = kind;
 }
 
 async function withdrawVote() {
@@ -289,23 +268,34 @@ function renderVoteState() {
 
   btnKill.classList.remove("active");
   btnKeep.classList.remove("active");
+  btnKill.classList.remove("idle");
+  btnKeep.classList.remove("idle");
   btnKill.disabled = false;
   btnKeep.disabled = false;
 
-  const kind    = myVote?.kind || null;
-  const anonTag = myVote?.anon ? " (anonymously)" : "";
+  // No caller on screen — nothing to vote on. Shut both buttons.
+  if (!hasActiveCaller(currentState)) {
+    btnKill.disabled = true;
+    btnKeep.disabled = true;
+    btnKill.classList.add("idle");
+    btnKeep.classList.add("idle");
+    btnWith.style.display = "none";
+    box.className = "status-box waiting";
+    box.textContent = "⏳ Waiting for a caller to go on screen.";
+    return;
+  }
 
-  if (kind === "kill") {
+  if (myVote === "kill") {
     btnKill.classList.add("active");
     btnKill.disabled = true;
     box.className = "status-box kill-voted";
-    box.textContent = `☠️ KILL vote cast${anonTag}. Tap SHIELD to switch, or withdraw.`;
+    box.textContent = "☠️ KILL vote cast. Tap SHIELD to switch, or withdraw.";
     btnWith.style.display = "block";
-  } else if (kind === "keep") {
+  } else if (myVote === "keep") {
     btnKeep.classList.add("active");
     btnKeep.disabled = true;
     box.className = "status-box keep-voted";
-    box.textContent = `🛡 SHIELD vote cast${anonTag}. Tap KILL to switch, or withdraw.`;
+    box.textContent = "🛡 SHIELD vote cast. Tap KILL to switch, or withdraw.";
     btnWith.style.display = "block";
   } else {
     box.className = "status-box";
@@ -315,16 +305,13 @@ function renderVoteState() {
 }
 
 function showFired() {
-  const voters     = currentState.voters     || [];
-  const defenders  = currentState.defenders  || [];
-  const anonSet    = new Set(currentState.anonVoters || []);
-  const mask = n => anonSet.has(n) ? "🎭 Mystery Member" : esc(n);
-
+  const voters    = currentState.voters    || [];
+  const defenders = currentState.defenders || [];
   const box = document.getElementById("statusBox");
   box.className = "status-box fired";
-  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(mask).join(", ") + "</small>";
+  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(esc).join(", ") + "</small>";
   if (defenders.length) {
-    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(mask).join(", ") + "</small>";
+    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(esc).join(", ") + "</small>";
   }
   box.innerHTML = html;
   document.getElementById("btnKill").disabled = true;
