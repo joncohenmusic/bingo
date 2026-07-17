@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ask a question — The Unconvinced</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:#08080f;
+  --panel:#12122a;
+  --line:rgba(255,255,255,.07);
+  --gold:#e8b84b;
+  --blue:#5b9bd5;
+  --text:#f0f0ff;
+  --dim:#8888aa;
+  --red:#ff2d55;
+  --green:#3dd68c;
+  /* Swapped by the tier picker — the preview card reads from these. */
+  --accent:#5b9bd5;
+  --accent-bg:rgba(20,28,45,.96);
+  --accent-line:rgba(91,155,213,.4);
+}
+
+body {
+  background:var(--bg);
+  font-family:'DM Sans', system-ui, -apple-system, sans-serif;
+  color:var(--text);
+  min-height:100vh;
+  padding:28px 20px 60px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap { max-width:520px; margin:0 auto; }
+
+/* ── Masthead ── */
+.eyebrow {
+  font-size:10px; font-weight:700; letter-spacing:.28em; text-transform:uppercase;
+  color:var(--dim); margin-bottom:10px;
+}
+h1 { font-size:30px; font-weight:700; letter-spacing:-.02em; margin-bottom:8px; }
+.standfirst { font-size:14px; color:var(--dim); line-height:1.6; margin-bottom:28px; }
+
+/* ── Preview card: a scaled copy of the real on-stream lower third ── */
+.preview-label {
+  font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--dim); margin-bottom:10px; display:block;
+}
+#card {
+  border-radius:14px; overflow:hidden; margin-bottom:32px;
+  background:var(--accent-bg);
+  border:1px solid var(--accent-line);
+  box-shadow:0 8px 40px rgba(0,0,0,.6);
+  transition:background .35s ease, border-color .35s ease, transform .45s ease, opacity .45s ease;
+}
+#card .accent-bar { height:3px; width:100%; background:var(--accent); transition:background .35s ease; }
+#card .card-body { padding:20px 22px 24px; }
+#card .tier-label {
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.12em;
+  color:var(--accent); margin-bottom:6px; transition:color .35s ease;
+}
+#card .card-name { font-size:20px; font-weight:700; color:#f0f0f0; line-height:1.2; margin-bottom:12px; }
+#card .card-divider { height:1px; background:rgba(255,255,255,.08); margin-bottom:14px; }
+#card .card-question { font-size:17px; font-weight:500; color:rgba(240,240,240,.92); line-height:1.5; }
+#card .ghost { color:#3a3a52; font-weight:400; }
+#card.sending { transform:translateY(-14px); opacity:0; }
+
+/* ── Form ── */
+.field { margin-bottom:20px; }
+.field-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:7px; }
+label {
+  font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--dim);
+}
+.counter { font-size:11px; color:#4a4a63; font-variant-numeric:tabular-nums; transition:color .2s; }
+.counter.warn { color:var(--gold); }
+.counter.over { color:var(--red); }
+
+input[type=text], textarea, select {
+  width:100%; background:#0d0d22; border:1px solid var(--line); border-radius:10px;
+  color:var(--text); padding:13px 14px; font-size:16px; font-family:inherit; outline:none;
+  transition:border-color .2s;
+}
+textarea { resize:vertical; min-height:130px; line-height:1.55; }
+select { appearance:none; -webkit-appearance:none; cursor:pointer; font-weight:600;
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 20px, calc(100% - 13px) 20px;
+  background-size:5px 5px, 5px 5px; background-repeat:no-repeat;
+}
+input:focus, textarea:focus, select:focus { border-color:var(--accent); }
+.hint { font-size:12px; color:#5a5a74; margin-top:6px; line-height:1.5; }
+
+/* ── Submit ── */
+#send {
+  width:100%; padding:16px; margin-top:8px; border-radius:12px; border:1px solid var(--accent);
+  background:rgba(91,155,213,.12); color:var(--accent);
+  font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.06em;
+  cursor:pointer; transition:background .2s, color .2s, opacity .2s;
+}
+#send:hover:not(:disabled) { background:var(--accent); color:#08080f; }
+#send:disabled { opacity:.4; cursor:not-allowed; }
+
+#msg { margin-top:16px; padding:13px 15px; border-radius:10px; font-size:13.5px; line-height:1.55; display:none; }
+#msg.err  { display:block; background:rgba(255,45,85,.1);  border:1px solid rgba(255,45,85,.35);  color:#ff8aaa; }
+#msg.ok   { display:block; background:rgba(61,214,140,.1); border:1px solid rgba(61,214,140,.35); color:var(--green); }
+
+/* ── Sent state ── */
+#done { display:none; text-align:center; padding:36px 0 8px; }
+#done.show { display:block; }
+#done .tick { font-size:44px; margin-bottom:14px; }
+#done h2 { font-size:22px; font-weight:700; margin-bottom:8px; }
+#done p { font-size:14px; color:var(--dim); line-height:1.6; margin-bottom:24px; }
+#again {
+  background:none; border:1px solid var(--line); color:var(--dim); border-radius:10px;
+  padding:12px 22px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  transition:border-color .2s, color .2s;
+}
+#again:hover { border-color:var(--gold); color:var(--gold); }
+
+.footer { margin-top:36px; padding-top:20px; border-top:1px solid var(--line);
+  font-size:11.5px; color:#4a4a63; line-height:1.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition:none !important; animation:none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">The Unconvinced · Members</div>
+  <h1>Ask a question</h1>
+  <p class="standfirst">Your question goes straight into the queue for the next live show. No deadline — send it whenever.</p>
+
+  <div id="form">
+    <span class="preview-label">As it will appear on stream</span>
+    <div id="card">
+      <div class="accent-bar"></div>
+      <div class="card-body">
+        <div class="tier-label" id="c-tier">Inquirer</div>
+        <div class="card-name" id="c-name"><span class="ghost">Your name</span></div>
+        <div class="card-divider"></div>
+        <div class="card-question" id="c-q"><span class="ghost">Your question appears here.</span></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-head"><label for="f-name">Name</label><span class="counter" id="n-count">0/40</span></div>
+      <input type="text" id="f-name" maxlength="40" autocomplete="name" placeholder="However you want to be introduced">
+    </div>
+
+    <div class="field">
+      <div class="field-head"><label for="f-tier">Your tier</label></div>
+      <select id="f-tier">
+        <option value="inquirer">Inquirer</option>
+        <option value="innercircle">Inner Circle</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <div class="field-head"><label for="f-q">Question</label><span class="counter" id="q-count">0/500</span></div>
+      <textarea id="f-q" maxlength="500" placeholder="One clear question works better than three vague ones."></textarea>
+    </div>
+
+    <div class="field">
+      <div class="field-head"><label for="f-pass">Members' passphrase</label></div>
+      <input type="text" id="f-pass" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="From the perks tab">
+      <p class="hint">Find it under your membership perks on YouTube. It keeps this page from being spammed.</p>
+    </div>
+
+    <button id="send">Send to the queue</button>
+    <div id="msg"></div>
+  </div>
+
+  <div id="done">
+    <div class="tick">⚖️</div>
+    <h2>In the queue</h2>
+    <p>Jon has it. He reads questions live — yours may come up on the next show.</p>
+    <button id="again">Ask another</button>
+  </div>
+
+  <p class="footer">Questions are read on stream at Jon's discretion. Nothing is published anywhere else.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── Q&A project config ───────────────────────────────────────────────────────
+// This is the unconvinced-qa project — NOT believer-bingo. Safe to publish:
+// a Firebase web config identifies the project, it doesn't authenticate anyone.
+// The Firestore rules are what actually guard the inbox.
+const firebaseConfig = {
+  apiKey: "AIzaSyDpScQlmEVJyb8g6ljRap0hpt3CjmasgPk",
+  authDomain: "unconvinced-qa.firebaseapp.com",
+  projectId: "unconvinced-qa",
+  storageBucket: "unconvinced-qa.firebasestorage.app",
+  messagingSenderId: "749181106234",
+  appId: "1:749181106234:web:2b0a8b1c4c06015599dd03"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const inbox = collection(db, "qaInbox");
+
+const $ = id => document.getElementById(id);
+const TIERS = {
+  inquirer:    { label: "Inquirer",     accent:"#5b9bd5", bg:"rgba(20,28,45,.96)", line:"rgba(91,155,213,.4)" },
+  innercircle: { label: "Inner Circle", accent:"#e8b84b", bg:"rgba(40,28,10,.96)", line:"rgba(232,184,75,.4)" }
+};
+
+// ── Live preview ────────────────────────────────────────────────────────────
+function paint() {
+  const name = $("f-name").value.trim();
+  const q    = $("f-q").value.trim();
+  const tier = TIERS[$("f-tier").value] || TIERS.inquirer;
+
+  const root = document.documentElement.style;
+  root.setProperty("--accent", tier.accent);
+  root.setProperty("--accent-bg", tier.bg);
+  root.setProperty("--accent-line", tier.line);
+
+  $("c-tier").textContent = tier.label;
+  $("c-name").innerHTML = name ? esc(name) : '<span class="ghost">Your name</span>';
+  $("c-q").innerHTML    = q    ? esc(q)    : '<span class="ghost">Your question appears here.</span>';
+
+  count("f-name", "n-count", 40);
+  count("f-q", "q-count", 500);
+}
+
+function count(inputId, elId, max) {
+  const n  = $(inputId).value.length;
+  const el = $(elId);
+  el.textContent = `${n}/${max}`;
+  el.classList.toggle("warn", n > max * 0.9 && n < max);
+  el.classList.toggle("over", n >= max);
+}
+
+["f-name", "f-q", "f-tier"].forEach(id => $(id).addEventListener("input", paint));
+$("f-tier").addEventListener("change", paint);
+paint();
+
+// ── Submit ──────────────────────────────────────────────────────────────────
+$("send").addEventListener("click", async () => {
+  const name = $("f-name").value.trim();
+  const q    = $("f-q").value.trim();
+  const tier = $("f-tier").value;
+  // Uppercased before it goes anywhere: the rule does an exact string match,
+  // so without this a member typing lowercase on a phone gets a bogus
+  // "wrong passphrase" and no way to work out why.
+  const pass = $("f-pass").value.trim().toUpperCase();
+
+  if (!name)          return fail("Add your name so Jon knows who's asking.");
+  if (!q)             return fail("Write your question first.");
+  if (q.length < 10)  return fail("That's a little short — give Jon something to work with.");
+  if (!pass)          return fail("The passphrase is on the perks tab of your membership.");
+
+  const btn = $("send");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  hideMsg();
+
+  try {
+    await addDoc(inbox, {
+      name, question: q, tier, passphrase: pass, createdAt: serverTimestamp()
+    });
+    $("card").classList.add("sending");
+    setTimeout(() => {
+      $("form").style.display = "none";
+      $("done").classList.add("show");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 450);
+  } catch (e) {
+    console.error(e);
+    if (e.code === "permission-denied") {
+      fail("That passphrase isn't right. Check the perks tab on your membership and try again.");
+    } else if (e.code === "unavailable") {
+      fail("Can't reach the server. Check your connection and try again.");
+    } else {
+      fail("Something went wrong sending that. Try again in a moment.");
+    }
+    btn.disabled = false;
+    btn.textContent = "Send to the queue";
+  }
+});
+
+$("again").addEventListener("click", () => {
+  $("f-q").value = "";
+  $("card").classList.remove("sending");
+  $("done").classList.remove("show");
+  $("form").style.display = "";
+  $("send").disabled = false;
+  $("send").textContent = "Send to the queue";
+  hideMsg();
+  paint();
+  $("f-q").focus();
+});
+
+// Ctrl/Cmd+Enter to send
+$("f-q").addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") $("send").click();
+});
+
+function fail(text) { const m = $("msg"); m.className = "err"; m.textContent = text; }
+function hideMsg()  { $("msg").className = ""; $("msg").textContent = ""; }
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+</script>
+</body>
+</html>
