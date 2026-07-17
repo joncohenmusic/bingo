@@ -165,7 +165,7 @@ input:focus, textarea:focus, select:focus { border-color:var(--accent); }
       <textarea id="f-q" maxlength="500" placeholder="One clear question works better than three vague ones."></textarea>
     </div>
 
-    <div class="field">
+    <div class="field" id="pass-field">
       <div class="field-head"><label for="f-pass">Members' passphrase</label></div>
       <input type="text" id="f-pass" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="From the perks tab">
       <p class="hint">Find it under your membership perks on YouTube. It keeps this page from being spammed.</p>
@@ -244,6 +244,25 @@ function count(inputId, elId, max) {
 $("f-tier").addEventListener("change", paint);
 paint();
 
+// ── Passphrase via ?p= ──────────────────────────────────────────────────────
+// The members-only link carries the passphrase, so nobody has to type it. No
+// weaker than asking them to: the passphrase and the link live in the same
+// members-only perk, so anyone who could leak one could leak the other. The
+// field still works for anyone arriving on a bare URL.
+let passPreset = false;
+const preset = (new URLSearchParams(location.search).get("p") || "").trim();
+if (preset) {
+  $("f-pass").value = preset;
+  $("pass-field").style.display = "none";
+  passPreset = true;
+}
+
+function revealPassField() {
+  $("pass-field").style.display = "";
+  passPreset = false;
+  $("f-pass").focus();
+}
+
 // ── Submit ──────────────────────────────────────────────────────────────────
 $("send").addEventListener("click", async () => {
   const name = $("f-name").value.trim();
@@ -277,7 +296,16 @@ $("send").addEventListener("click", async () => {
   } catch (e) {
     console.error(e);
     if (e.code === "permission-denied") {
-      fail("That passphrase isn't right. Check the perks tab on your membership and try again.");
+      if (passPreset) {
+        // The link carried a passphrase and the server refused it — almost
+        // certainly a rotated passphrase and an old bookmark. Give them the
+        // field back rather than a dead end.
+        $("f-pass").value = "";
+        revealPassField();
+        fail("This link's passphrase is out of date. Check the perks tab on your membership and enter the current one below.");
+      } else {
+        fail("That passphrase isn't right. Check the perks tab on your membership and try again.");
+      }
     } else if (e.code === "unavailable") {
       fail("Can't reach the server. Check your connection and try again.");
     } else {
