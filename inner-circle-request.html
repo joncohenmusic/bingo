@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inner Circle — Request Access (v1.0)</title>
+<!--
+  ══════════════════════════════════════════════════════════════
+  INNER CIRCLE — REQUEST ACCESS      v1.0      13 Aug 2026
+  ══════════════════════════════════════════════════════════════
+  Replaces inner-circle-join.html, which wrote straight into
+  config/innerCircle and could therefore destroy the member list.
+
+  This page CANNOT touch the member list. It only creates a
+  document in joinRequests, which Jon reviews in
+  inner-circle-requests-local-v1.0.html before adding anyone
+  by hand in the Caller Log.
+
+  CHANGELOG
+  v1.0  First build. No access phrase (the old one was public in
+        the repo and was the way strangers got in). Writes only
+        to joinRequests. Honeypot field plus a local cooldown to
+        blunt casual spam.
+  ══════════════════════════════════════════════════════════════
+-->
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --gold:#E8B84B; --gold-border:rgba(232,184,75,.35);
+  --bg:#0e0d0b; --surface:rgba(22,18,10,.95);
+  --text:#F2F0EC; --text-dim:rgba(242,240,236,.45);
+  --red:#ff6b8a;
+}
+html,body{min-height:100vh;background:var(--bg);font-family:'DM Sans',sans-serif;
+  color:var(--text);display:flex;align-items:center;justify-content:center;padding:24px;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(232,184,75,.07),transparent 70%),
+             radial-gradient(ellipse 40% 40% at 80% 80%,rgba(232,184,75,.04),transparent 60%);}
+.card{position:relative;z-index:1;width:100%;max-width:480px;background:var(--surface);
+  border:1px solid var(--gold-border);border-radius:20px;padding:44px 44px 36px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.4),0 32px 80px rgba(0,0,0,.6);}
+.card::before{content:'';position:absolute;top:0;left:48px;right:48px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--gold);
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.eyebrow::before{content:'⭐';font-size:13px;}
+h1{font-family:'DM Serif Display',serif;font-size:32px;font-weight:400;
+  line-height:1.15;margin-bottom:10px;}
+.subtitle{font-size:14px;color:var(--text-dim);line-height:1.6;margin-bottom:32px;}
+.field{margin-bottom:20px;}
+label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;}
+input[type=text],select,textarea{width:100%;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px 16px;
+  font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);outline:none;
+  transition:border-color .2s,box-shadow .2s;-webkit-appearance:none;}
+select{cursor:pointer;}
+select option{background:#161208;color:var(--text);}
+textarea{resize:vertical;min-height:76px;line-height:1.5;}
+input:focus,select:focus,textarea:focus{border-color:var(--gold-border);
+  box-shadow:0 0 0 3px rgba(232,184,75,.08);}
+input::placeholder,textarea::placeholder{color:rgba(242,240,236,.2);}
+.hint{font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.4;}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}
+.divider{height:1px;background:rgba(255,255,255,.06);margin:26px 0;}
+button{width:100%;background:var(--gold);color:#0e0d0b;border:none;border-radius:10px;
+  padding:15px 20px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;transition:opacity .2s,transform .15s;}
+button:hover:not(:disabled){opacity:.92;transform:translateY(-1px);}
+button:disabled{opacity:.5;cursor:not-allowed;}
+.msg{border-radius:8px;padding:12px 14px;font-size:13px;margin-top:16px;
+  display:none;line-height:1.5;}
+.msg.visible{display:block;}
+.msg.error{background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.25);color:var(--red);}
+#state-success{display:none;text-align:center;padding:12px 0;}
+.success-icon{font-size:48px;margin-bottom:20px;display:block;
+  animation:pop .5s cubic-bezier(.22,1,.36,1);}
+@keyframes pop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
+.success-title{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:10px;}
+.success-msg{font-size:14px;color:var(--text-dim);line-height:1.7;}
+.success-name{color:var(--gold);font-weight:600;}
+.brand{text-align:center;margin-top:26px;font-size:12px;
+  color:rgba(242,240,236,.2);letter-spacing:.5px;}
+.ver{font-size:10px;color:rgba(242,240,236,.16);letter-spacing:1px;margin-top:4px;text-align:center;}
+@media (max-width:520px){.card{padding:34px 26px 30px;}h1{font-size:26px;}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <div id="state-form">
+    <div class="eyebrow">Inner Circle</div>
+    <h1>Request your place</h1>
+    <p class="subtitle">Tell Jon who you are and he'll add you before the next stream. You'll then appear on the roll and be able to vote on the Kill Switch.</p>
+
+    <div class="field">
+      <label for="displayName">Your display name</label>
+      <input type="text" id="displayName" maxlength="40" placeholder="Exactly as you appear in chat"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="hint">Use the name you post under during live streams, so Jon can match you up.</div>
+    </div>
+
+    <div class="field">
+      <label for="platform">How you support the channel</label>
+      <select id="platform">
+        <option value="Patreon">Patreon</option>
+        <option value="YouTube">YouTube member</option>
+        <option value="Moderator">Moderator</option>
+        <option value="Other">Something else</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="note">Anything Jon should know <span style="text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <textarea id="note" maxlength="200" placeholder="A different name on Patreon, when you joined, that sort of thing"></textarea>
+    </div>
+
+    <input type="text" id="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <div class="msg error" id="errorMsg"></div>
+
+    <div class="divider"></div>
+
+    <button id="submitBtn">Send request</button>
+  </div>
+
+  <div id="state-success">
+    <span class="success-icon">⭐</span>
+    <div class="success-title">Request sent.</div>
+    <p class="success-msg">
+      Thanks, <span class="success-name" id="confirmedName"></span>.<br><br>
+      Jon reviews these before each stream. Once he's added you, your name appears
+      on the Inner Circle roll and your Kill Switch vote goes live.
+    </p>
+  </div>
+
+  <div class="brand">The Unconvinced</div>
+  <div class="ver">Request page v1.0</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+const COOLDOWN_MS = 60 * 60 * 1000;   // one request per browser per hour
+const LS_KEY = "ic_request_sent_at";
+
+const $ = id => document.getElementById(id);
+const btn = $("submitBtn");
+
+function showError(msg){ const el = $("errorMsg"); el.textContent = msg; el.classList.add("visible"); }
+function clearError(){ $("errorMsg").classList.remove("visible"); }
+
+btn.addEventListener("click", send);
+$("displayName").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+
+async function send(){
+  clearError();
+
+  const name     = $("displayName").value.trim();
+  const platform = $("platform").value;
+  const note     = $("note").value.trim();
+
+  if (!name) { showError("Enter the name you use in chat so Jon can find you."); return; }
+  if ($("website").value) { return; }               // honeypot: bots fill this, people don't
+
+  const last = parseInt(localStorage.getItem(LS_KEY) || "0", 10);
+  if (Date.now() - last < COOLDOWN_MS) {
+    showError("You've already sent a request. Jon will pick it up before the next stream.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+
+  try {
+    await addDoc(collection(db, "joinRequests"), {
+      name,
+      platform,
+      note: note || "",
+      createdAt: serverTimestamp()
+    });
+
+    localStorage.setItem(LS_KEY, String(Date.now()));
+    $("confirmedName").textContent = name;
+    $("state-form").style.display    = "none";
+    $("state-success").style.display = "block";
+
+  } catch (err) {
+    console.error(err);
+    btn.disabled = false;
+    btn.textContent = "Send request";
+    showError("That didn't send. Try again in a moment, or message Jon directly.");
+  }
+}
+</script>
+
+</body>
+</html>
