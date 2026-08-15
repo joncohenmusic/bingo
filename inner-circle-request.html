@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inner Circle — Request Access (v1.0)</title>
+<title>Inner Circle — Request Access (v1.1)</title>
 <!--
   ══════════════════════════════════════════════════════════════
   INNER CIRCLE — REQUEST ACCESS      v1.0      13 Aug 2026
@@ -138,13 +138,17 @@ button:disabled{opacity:.5;cursor:not-allowed;}
   </div>
 
   <div class="brand">The Unconvinced</div>
-  <div class="ver">Request page v1.0</div>
+  <div class="ver">Request page v1.1</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -156,7 +160,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+// v1.1: App Check plus a silent identity — the rules require both.
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
+});
+const db   = getFirestore(app);
+const auth = getAuth(app);
+const authReady = new Promise((resolve, reject) => {
+  onAuthStateChanged(auth, u => { if (u) resolve(u); });
+  signInAnonymously(auth).catch(reject);
+});
 
 const COOLDOWN_MS = 60 * 60 * 1000;   // one request per browser per hour
 const LS_KEY = "ic_request_sent_at";
@@ -190,6 +204,7 @@ async function send(){
   btn.textContent = "Sending…";
 
   try {
+    await authReady;
     await addDoc(collection(db, "joinRequests"), {
       name,
       platform,
