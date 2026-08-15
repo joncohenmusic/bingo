@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inner Circle — Spotlight (v1.1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold-hi:#EBD18B;
+    --gold:#C9A24B;
+    --gold-lo:#8C6A2E;
+    --cream:#F6EFE2;
+    --muted:rgba(246,239,226,.55);
+    --card:440px;       /* width of the corner card */
+    --pad:34px;         /* distance from the screen edges */
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:transparent;overflow:hidden;
+            font-family:'Playfair Display',serif;-webkit-font-smoothing:antialiased;}
+
+  /* soft scrim anchored top-right so text reads over ANY scene — including
+     white / pale caller cams. A wide-short ellipse keeps the full name row
+     backed (cream is the lightest element, so it needs the most floor),
+     then fades to nothing so it still reads as a vignette, not a box. */
+  #scrim{position:fixed;top:0;right:0;width:820px;height:460px;pointer-events:none;
+    background:radial-gradient(ellipse 760px 340px at 100% 4%,
+      rgba(8,7,5,.82) 0%,
+      rgba(8,7,5,.76) 38%,
+      rgba(8,7,5,.56) 62%,
+      rgba(8,7,5,.30) 80%,
+      transparent 95%);
+    opacity:0;transition:opacity .7s ease;}
+  #scrim.on{opacity:1;}
+
+  #card{position:fixed;top:var(--pad);right:var(--pad);width:var(--card);
+    display:flex;flex-direction:column;align-items:flex-end;text-align:right;
+    opacity:0;transition:opacity .6s ease;}
+  #card.on{opacity:1;}
+  /* gentle fade when the roll call finishes */
+  #card.farewell{transition:opacity 1.6s ease;}
+  #scrim.farewell{transition:opacity 1.6s ease;}
+
+  .top{display:flex;align-items:center;justify-content:flex-end;gap:14px;width:100%;}
+  .eyebrow{font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.42em;
+    text-indent:.42em;color:var(--gold);text-transform:uppercase;
+    text-shadow:0 1px 8px rgba(0,0,0,.7);white-space:nowrap;}
+
+  /* the small ring — the circle motif, drawn fresh for each member */
+  .mark{width:30px;height:30px;flex:0 0 auto;overflow:visible;}
+  .mark .track{fill:none;stroke:rgba(201,162,75,.18);stroke-width:2;}
+  .mark .arc{fill:none;stroke:var(--gold);stroke-width:2.4;stroke-linecap:round;
+    filter:drop-shadow(0 0 3px rgba(201,162,75,.5));
+    stroke-dasharray:var(--mc);stroke-dashoffset:var(--mc);
+    transform:rotate(-90deg);transform-origin:50% 50%;}
+  .mark .arc.draw{transition:stroke-dashoffset .7s cubic-bezier(.4,0,.1,1);stroke-dashoffset:0;}
+
+  .namewrap{width:100%;overflow:hidden;margin-top:6px;
+    opacity:0;transform:translateX(22px);}
+  .namewrap.in{opacity:1;transform:none;
+    transition:opacity .5s ease,transform .5s cubic-bezier(.2,.9,.25,1);}
+  .namewrap.out{opacity:0;transform:translateX(-14px);
+    transition:opacity .4s ease,transform .4s ease;}
+  .name{font-family:'Playfair Display',serif;font-weight:600;color:var(--cream);
+    font-size:46px;line-height:1.05;letter-spacing:.005em;white-space:nowrap;
+    text-shadow:0 2px 18px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.72),0 0 2px rgba(0,0,0,.85);}
+
+  /* gold rule that draws in under the name */
+  .rule{height:2px;width:0;margin-top:12px;align-self:flex-end;
+    background:linear-gradient(90deg,transparent,var(--gold-lo),var(--gold),var(--gold-hi));
+    box-shadow:0 0 6px rgba(201,162,75,.4);}
+  .rule.draw{width:78%;transition:width .6s cubic-bezier(.4,0,.1,1);}
+
+  .counter{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.16em;
+    color:var(--gold);margin-top:10px;text-shadow:0 1px 6px rgba(0,0,0,.7);
+    opacity:0;transition:opacity .5s ease;}
+  .counter.on{opacity:.92;}
+  .counter .sep{color:rgba(201,162,75,.45);margin:0 .3em;}
+  .counter .tot{color:var(--muted);}
+
+  .closing .name{font-style:italic;font-size:40px;}
+  .note{font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.08em;
+    color:var(--muted);text-transform:uppercase;text-align:right;line-height:1.5;
+    width:100%;margin-top:6px;opacity:0;transition:opacity .5s ease;}
+  .note.on{opacity:1;}
+
+  #toast{position:fixed;top:calc(var(--pad) + 150px);right:var(--pad);
+    font-family:'Anton',sans-serif;font-size:13px;letter-spacing:.14em;color:var(--gold-hi);
+    background:rgba(9,8,6,.72);border:1px solid rgba(201,162,75,.35);border-radius:999px;
+    padding:7px 16px;text-transform:uppercase;opacity:0;transition:opacity .25s ease;}
+  #toast.on{opacity:1;}
+
+  @media (prefers-reduced-motion: reduce){
+    .mark .arc{transition:none!important;stroke-dashoffset:0!important;}
+    .rule{transition:none!important;}
+    .namewrap,.namewrap.in,.namewrap.out{transition:opacity .3s ease!important;transform:none!important;}
+  }
+</style>
+</head>
+<body>
+<div id="scrim"></div>
+<div id="card">
+  <div class="top">
+    <div class="eyebrow">The Inner Circle</div>
+    <svg class="mark" viewBox="0 0 30 30" aria-hidden="true">
+      <circle class="track" cx="15" cy="15" r="13"/>
+      <circle class="arc"   cx="15" cy="15" r="13"/>
+    </svg>
+  </div>
+  <div class="namewrap" id="namewrap"><div class="name" id="name"></div></div>
+  <div class="rule" id="rule"></div>
+  <div class="counter" id="counter"><span class="cur">1</span><span class="sep">/</span><span class="tot">46</span></div>
+</div>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+// ── Same Firestore list the Inner Circle Wall uses — one source of truth
+const FB_CONFIG = {
+  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
+  authDomain: "believer-bingo.firebaseapp.com",
+  projectId: "believer-bingo",
+  storageBucket: "believer-bingo.firebasestorage.app",
+  messagingSenderId: "1054324566020",
+  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
+};
+
+// ── Settings: ?secs=3  ?loop=1  ?order=alpha|random  ?demo=1
+const P = new URLSearchParams(location.search);
+let secs    = clampSecs(parseFloat(P.get('secs')) || 3);
+const loop  = P.get('loop') === '1';
+const order = (P.get('order') || 'random').toLowerCase();
+const demo  = P.get('demo') === '1';
+
+// circumference of the little ring (r=13)
+document.documentElement.style.setProperty('--mc', (2 * Math.PI * 13).toFixed(1));
+
+const el = {
+  scrim:   document.getElementById('scrim'),
+  card:    document.getElementById('card'),
+  arc:     document.querySelector('.mark .arc'),
+  namewrap:document.getElementById('namewrap'),
+  name:    document.getElementById('name'),
+  rule:    document.getElementById('rule'),
+  counter: document.getElementById('counter'),
+  cur:     document.querySelector('.counter .cur'),
+  tot:     document.querySelector('.counter .tot'),
+  toast:   document.getElementById('toast'),
+};
+
+const DEMO_NAMES = ["Sarah Whitfield","Marcus Bell","The Reverend Doubt","Priya Anand",
+  "Alejandro Vargas","Kit","Eleanor Hughes-Mainwaring","Dave","Tomasz Kowalczyk",
+  "Grace O'Connell","Sam","CatB"];
+
+let roster = [];
+let runToken = 0;
+let started = false;
+let ready = false;     // true once the member list has loaded at least once
+
+if (demo){ roster = DEMO_NAMES.slice(); begin(); }
+else {
+  try {
+    const app = initializeApp(FB_CONFIG, "inner-circle-spotlight");
+    // v1.1: App Check + silent anonymous auth so this keeps reading once
+    // App Check enforcement is switched on. Read-only page — never writes.
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+      isTokenAutoRefreshEnabled: true
+    });
+    signInAnonymously(getAuth(app)).catch(e => console.error("[auth]", e));
+    const db  = getFirestore(app);
+    onSnapshot(doc(db, "innerCircleWall", "state"), snap => {
+      const names = (snap.exists() && Array.isArray(snap.data().names)) ? snap.data().names : [];
+      roster = names.filter(n => (n || '').trim());
+      if (!started) begin();
+    }, () => fallback());
+    setTimeout(() => { if (!started) fallback(); }, 4000);
+  } catch (e) { fallback(); }
+}
+
+function fallback(){
+  if (started) return;
+  ready = true;
+  if (roster.length){ begin(); return; }
+  el.scrim.classList.add('on'); el.card.classList.add('on');
+  showNote("No members found — check the Inner Circle list in your caller log, or add ?demo=1 to preview.");
+}
+
+// ── The roll call ---------------------------------------------------------
+async function begin(){
+  ready = true;
+  if (started && roster.length) return;
+  started = true;
+  runToken++;
+  const my = runToken;
+  const list = orderRoster(roster.length ? roster : DEMO_NAMES);
+
+  el.scrim.classList.add('on');
+  el.card.classList.add('on');
+  el.tot.textContent = String(list.length);
+  await wait(500, my);
+
+  do {
+    for (let i = 0; i < list.length; i++){
+      if (my !== runToken) return;
+      await showName(list[i], i + 1, my);
+    }
+  } while (loop && my === runToken);
+
+  if (my === runToken) closing();
+}
+
+async function showName(text, idx, my){
+  el.name.textContent = text;
+  fitName();
+  el.cur.textContent = String(idx);
+  el.counter.classList.add('on');
+
+  el.arc.classList.remove('draw');  void el.arc.offsetWidth; el.arc.classList.add('draw');
+  el.rule.classList.remove('draw'); void el.rule.offsetWidth; el.rule.classList.add('draw');
+  el.namewrap.classList.remove('out'); el.namewrap.classList.add('in');
+
+  await wait(secs * 1000, my);
+  if (my !== runToken) return;
+
+  el.namewrap.classList.remove('in'); el.namewrap.classList.add('out');
+  el.rule.classList.remove('draw');
+  await wait(420, my);
+}
+
+async function closing(){
+  const my = runToken;
+  document.getElementById('card').classList.add('closing');
+  el.counter.classList.remove('on');
+  el.name.textContent = "Thank you";
+  fitName();
+  el.arc.classList.remove('draw'); void el.arc.offsetWidth; el.arc.classList.add('draw');
+  el.rule.classList.remove('draw'); void el.rule.offsetWidth; el.rule.classList.add('draw');
+  el.namewrap.classList.remove('out'); el.namewrap.classList.add('in');
+
+  await wait(6000, my);                 // hold the thank-you
+  if (my !== runToken) return;          // a restart/hide cancels the fade
+
+  el.card.classList.add('farewell'); el.scrim.classList.add('farewell');
+  void el.card.offsetWidth;             // let the slow transition take effect
+  el.card.classList.remove('on'); el.scrim.classList.remove('on');
+
+  await wait(1700, my);                 // let it fade out
+  if (my !== runToken) return;
+
+  // reset to a clean blank state, ready for the next show
+  el.card.classList.remove('farewell','closing');
+  el.scrim.classList.remove('farewell');
+  el.namewrap.classList.remove('in','out');
+  el.name.textContent = '';
+  started = false;
+}
+
+function orderRoster(arr){
+  const a = arr.slice();
+  if (order === 'alpha') a.sort((x,y) => x.localeCompare(y,'en',{sensitivity:'base'}));
+  else for (let i = a.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+// fit long names to the card width
+function fitName(){
+  const max = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--card')) - 30;
+  el.name.style.whiteSpace = 'nowrap';
+  let size = 46; el.name.style.fontSize = size + 'px';
+  let guard = 0;
+  while (el.name.scrollWidth > max && size > 24 && guard++ < 30){ size -= 2; el.name.style.fontSize = size + 'px'; }
+  el.name.style.whiteSpace = (el.name.scrollWidth > max) ? 'normal' : 'nowrap';
+}
+
+function showNote(msg){
+  document.getElementById('namewrap').style.display = 'none';
+  el.rule.style.display = 'none'; el.counter.style.display = 'none';
+  const n = document.createElement('div'); n.className = 'note'; n.textContent = msg;
+  el.card.appendChild(n); requestAnimationFrame(() => n.classList.add('on'));
+}
+
+// ── Controls: Space restart · ↑/↓ speed · E/Esc → closing -----------------
+addEventListener('keydown', e => {
+  if (e.code === 'Space'){ e.preventDefault(); restart(); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); bumpSecs(+0.5); }
+  else if (e.key === 'ArrowDown'){ e.preventDefault(); bumpSecs(-0.5); }
+  else if (e.key === 'e' || e.key === 'Escape'){ runToken++; closing(); }
+});
+function restart(){
+  started = false;
+  el.card.classList.remove('closing');
+  el.namewrap.classList.remove('in','out');
+  begin();
+}
+
+// Instantly wipe everything to a blank frame (so OBS can never cache a stale
+// name) and cancel any in-flight run.
+function blankNow(){
+  runToken++;
+  el.namewrap.classList.remove('in','out');
+  el.name.textContent = '';
+  el.rule.classList.remove('draw');
+  el.arc.classList.remove('draw');
+  el.counter.classList.remove('on');
+  el.card.classList.remove('on','closing','farewell');
+  el.scrim.classList.remove('on','farewell');
+  started = false;
+}
+
+// When the OBS source is hidden, blank it; when it's shown again, run from #1.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) blankNow();
+  else if (ready) restart();
+});
+window.addEventListener('pagehide', blankNow);
+function bumpSecs(d){ secs = clampSecs(secs + d); toast(`${secs.toFixed(1)}s per name`); }
+function clampSecs(s){ return Math.min(10, Math.max(1, isFinite(s) ? s : 3)); }
+
+let toastT;
+function toast(msg){
+  el.toast.textContent = msg; el.toast.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.toast.classList.remove('on'), 1400);
+}
+
+function wait(ms, my){
+  return new Promise(res => {
+    const t = setInterval(() => { if (my !== runToken){ clearInterval(t); res(); } }, 80);
+    setTimeout(() => { clearInterval(t); res(); }, ms);
+  });
+}
+</script>
+</body>
+</html>
