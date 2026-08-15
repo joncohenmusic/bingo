@@ -3,12 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inner Circle — The Kill Switch (v2.0)</title>
+<title>Inner Circle — The Kill Switch (v2.1)</title>
 <!--
   ══════════════════════════════════════════════════════════════════════
   THE KILL SWITCH                    v2.0            14 Aug 2026
   ══════════════════════════════════════════════════════════════════════
   CHANGELOG
+  v2.1  Fix: the page treated ANY signed-in user as authenticated. Because
+        Firebase shares an auth session across the whole domain, a visitor who
+        had opened bingo or rate.html already had a silent anonymous account,
+        so vote.html skipped Google sign-in and let them claim a member name.
+        Now it uses its own named Firebase app (separate auth state) and
+        explicitly rejects anonymous sessions. Also shows which Google account
+        you're signed in as, so a member can tell they've used the right one.
   v2.0  Rebuilt after the 13 Aug attack, in which 25 kill votes were cast
         under real members' names.
         · App Check — Firestore refuses requests that didn't come from
@@ -94,6 +101,7 @@ select:focus{border-color:var(--gold);}
   </div>
 
   <div id="stepClaim" style="display:none">
+    <p class="hint" style="margin:0 0 6px" id="claimAcct"></p>
     <p class="hint" style="margin:0 0 16px">First time here — tell us which member you are. You only do this once.</p>
     <div class="select-wrap">
       <label>YOUR INNER CIRCLE NAME</label>
@@ -105,7 +113,7 @@ select:focus{border-color:var(--gold);}
   </div>
 
   <div id="stepVote" style="display:none">
-    <div class="who">Voting as <b id="whoName">—</b><button id="btnSignOut">sign out</button></div>
+    <div class="who">Voting as <b id="whoName">—</b><span id="voteAcct" style="opacity:.6"></span><button id="btnSignOut">sign out</button></div>
     <button class="btn kill" id="btnKill">☠️ ACTIVATE KILL SWITCH</button>
     <button class="btn keep" id="btnKeep">🛡 SHIELD THIS CALLER</button>
     <div class="live-tally" id="liveTally" style="display:none">
@@ -118,7 +126,7 @@ select:focus{border-color:var(--gold);}
     <p class="hint" id="hintText">Each SHIELD cancels one KILL.</p>
   </div>
 
-  <div class="ver">Kill Switch v2.0</div>
+  <div class="ver">Kill Switch v2.1</div>
 </div>
 
 <script type="module">
@@ -139,7 +147,7 @@ const firebaseConfig = {
   appId: "1:1054324566020:web:dc6739c69458011efe2d51"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig, "kill-switch");
 initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
   isTokenAutoRefreshEnabled: true
@@ -187,10 +195,22 @@ $("btnGoogle").onclick = async () => {
 $("btnSignOut").onclick = () => signOut(auth);
 
 onAuthStateChanged(auth, async user => {
+  // v2.1: an anonymous session is NOT signed in for our purposes. Bingo and
+  // rate.html create one silently on this same domain, and without this check
+  // their visitors would sail straight past Google sign-in.
+  if (user && user.isAnonymous) {
+    try { await signOut(auth); } catch (e) { console.error(e); }
+    me = null; myName = null;
+    show("stepSignIn");
+    return;
+  }
   me = user;
   myName = null;
   if (votesUnsub) { votesUnsub(); votesUnsub = null; }
   if (!user) { show("stepSignIn"); return; }
+  const acct = user.email || user.displayName || "";
+  document.getElementById("claimAcct").textContent = acct ? "Signed in as " + acct : "";
+  document.getElementById("voteAcct").textContent  = acct;
 
   try {
     const snap = await getDocs(namesCol);
