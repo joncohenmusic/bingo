@@ -742,6 +742,9 @@ body.sandbox .sandbox-banner { display: block; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -753,18 +756,33 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// ── Security layer (v2.0) ───────────────────────────────────────────────
+// App Check: Firestore rejects any request without a token proving it came
+// from this page in a real browser. Scripts pointed at the database fail.
+// Anonymous auth: silent, no login prompt, but gives this browser a real
+// identity so it can only write its own document and can be banned.
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
+});
+const auth = getAuth(app);
+let myUid = null;
+const authReady = new Promise((resolve, reject) => {
+  onAuthStateChanged(auth, u => { if (u) { myUid = u.uid; resolve(u); } });
+  signInAnonymously(auth).catch(err => { console.error("[auth] sign-in failed", err); reject(err); });
+});
+
 const db  = getFirestore(app);
 const stateRef = doc(db, "rateThisCaller", "state");
 
 // ── Identity ──────────────────────────────────────────
-const LS_KEYS = { id: "rtc_uid", name: "rtc_name" };
-let userId = localStorage.getItem(LS_KEYS.id);
-if (!userId) {
-  userId = crypto.randomUUID();
-  localStorage.setItem(LS_KEYS.id, userId);
-}
+const LS_KEYS = { name: "rtc_name" };
 let displayName = localStorage.getItem(LS_KEYS.name) || "";
-const voteRef = doc(db, "rateThisCaller", "state", "votes", userId);
+// v2.0: the vote document is keyed to the Firebase identity, so rules can
+// enforce "you may only write your own vote". Assigned once auth resolves.
+let voteRef = null;
+authReady.then(u => { voteRef = doc(db, "rateThisCaller", "state", "votes", u.uid); })
+         .catch(() => toast("Connection problem — try reloading", 5000));
 
 // ── State ─────────────────────────────────────────────
 let currentSessionId = null;
@@ -953,6 +971,8 @@ function flushWrite() {
 }
 async function pushVote() {
   if (!displayName || !currentSessionId || isLocked) return;
+  await authReady;
+  if (!voteRef) return;
   try {
     await setDoc(voteRef, {
       displayName,
@@ -995,7 +1015,7 @@ onSnapshot(stateRef, snap => {
     if (!wasFirstLoad) {
       toast("New caller — reset");
       // Clear our previous vote so we don't pollute the new session
-      deleteDoc(voteRef).catch(() => {});
+      if (voteRef) deleteDoc(voteRef).catch(() => {});
     }
   } else if (!newSession) {
     currentSessionId = null;
@@ -1016,18 +1036,26 @@ onSnapshot(votesRef, snap => {
     lastAgg = { sub: 0, gf: 0, count: 0 };
     return;
   }
-  let sx = 0, sy = 0, n = 0;
+  // v2.0: median, not mean. A block of identical votes barely shifts a median,
+  // so even if something gets past App Check the crowd dot stays honest.
+  const gfs = [], subs = [];
   snap.forEach(doc => {
     const v = doc.data();
     if (v.sessionId !== currentSessionId) return;
     if (typeof v.substance !== "number" || typeof v.goodFaith !== "number") return;
-    sx += v.goodFaith;
-    sy += v.substance;
-    n++;
+    if (v.substance < -10 || v.substance > 10 || v.goodFaith < -10 || v.goodFaith > 10) return;
+    gfs.push(v.goodFaith);
+    subs.push(v.substance);
   });
+  const n = gfs.length;
+  const median = arr => {
+    if (!arr.length) return 0;
+    const a = arr.slice().sort((p, q) => p - q), m = a.length >> 1;
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  };
   voteCountNum.textContent = String(n);
   if (n > 0) {
-    const ax = sx / n, ay = sy / n;
+    const ax = median(gfs), ay = median(subs);
     aggDot.style.left = axisToPctX(ax) + "%";
     aggDot.style.top  = axisToPctY(ay) + "%";
     aggDot.classList.remove("hidden");

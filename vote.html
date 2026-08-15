@@ -3,7 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inner Circle — The Kill Switch</title>
+<title>Inner Circle — The Kill Switch (v2.0)</title>
+<!--
+  ══════════════════════════════════════════════════════════════════════
+  THE KILL SWITCH                    v2.0            14 Aug 2026
+  ══════════════════════════════════════════════════════════════════════
+  CHANGELOG
+  v2.0  Rebuilt after the 13 Aug attack, in which 25 kill votes were cast
+        under real members' names.
+        · App Check — Firestore refuses requests that didn't come from
+          this page in a real browser, so scripts can't vote at all.
+        · Google sign-in — no more picking any name from a dropdown.
+        · Name claiming — each member claims their Inner Circle name once;
+          the claim lives at memberNames/{name} and can't be taken by
+          anyone else, because rules reject a create on an existing doc.
+        · One vote document per account at vote/current/votes/{uid}.
+          Rules check the claim, so you can only vote as yourself.
+        · The `fired` flag is no longer written by voters — the tally is
+          derived on read, so nobody can force or suppress a verdict.
+  v1.x  Dropdown of member names, votes stored as a map in vote/current.
+  ══════════════════════════════════════════════════════════════════════
+-->
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -18,24 +38,31 @@ body{background:var(--bg);font-family:system-ui,-apple-system,sans-serif;color:v
 .card{background:var(--panel);border:1px solid var(--gold-border);border-radius:20px;padding:32px 28px;max-width:380px;width:100%;text-align:center;}
 .crown{font-size:40px;margin-bottom:8px;}
 h1{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
-.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:28px;}
+.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:26px;}
 .caller-bar{min-height:22px;margin-bottom:20px;}
 .caller-name{color:var(--gold);font-size:12px;letter-spacing:1px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px;display:inline-block;}
 .caller-name.none{color:var(--text-dim);background:rgba(136,136,170,.08);border-color:rgba(136,136,170,.25);}
-.select-wrap{margin-bottom:24px;text-align:left;}
+.select-wrap{margin-bottom:20px;text-align:left;}
 label{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text-dim);display:block;margin-bottom:8px;}
 select{width:100%;background:#0d0d22;border:1px solid var(--gold-border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;}
 select:focus{border-color:var(--gold);}
-.btn-vote{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;border:2px solid;transition:all .2s;margin-bottom:10px;font-family:inherit;}
-.btn-vote.kill{background:var(--red-dim);border-color:var(--red);color:var(--red);}
-.btn-vote.kill:hover:not(:disabled){background:var(--red);color:#fff;}
-.btn-vote.keep{background:var(--keep-dim);border-color:var(--keep);color:var(--keep);}
-.btn-vote.keep:hover:not(:disabled){background:var(--keep);color:#062818;}
-.btn-vote.active{opacity:.5;cursor:default;}
-.btn-vote.idle{opacity:.3;filter:grayscale(1);}
-.btn-vote.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;margin-top:8px;}
-.btn-vote.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
-.btn-vote:disabled{cursor:not-allowed;}
+.btn{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;border:2px solid;transition:all .2s;margin-bottom:10px;font-family:inherit;}
+.btn.google{background:#fff;color:#1f1f1f;border-color:#fff;font-size:15px;}
+.btn.google:hover{opacity:.9;}
+.btn.claim{background:var(--gold-dim);border-color:var(--gold);color:var(--gold);}
+.btn.claim:hover:not(:disabled){background:var(--gold);color:#1a1200;}
+.btn.kill{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+.btn.kill:hover:not(:disabled){background:var(--red);color:#fff;}
+.btn.keep{background:var(--keep-dim);border-color:var(--keep);color:var(--keep);}
+.btn.keep:hover:not(:disabled){background:var(--keep);color:#062818;}
+.btn.active{opacity:.5;cursor:default;}
+.btn.idle{opacity:.3;filter:grayscale(1);}
+.btn.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;margin-top:8px;}
+.btn.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
+.btn:disabled{cursor:not-allowed;}
+.who{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:18px;flex-wrap:wrap;}
+.who b{color:var(--gold);font-weight:700;}
+.who button{background:none;border:none;color:var(--text-dim);font-size:11px;text-decoration:underline;cursor:pointer;font-family:inherit;}
 .live-tally{display:flex;justify-content:center;gap:14px;font-size:11px;letter-spacing:1px;color:var(--text-dim);margin:14px 0 4px;font-weight:600;}
 .live-tally .seg{display:flex;align-items:center;gap:5px;}
 .live-tally .seg.kill{color:var(--red);}
@@ -46,8 +73,10 @@ select:focus{border-color:var(--gold);}
 .status-box.keep-voted{background:var(--keep-dim);border:1px solid var(--keep-border);color:var(--keep);display:block;}
 .status-box.fired{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);display:block;}
 .status-box.waiting{background:rgba(136,136,170,.08);border:1px solid rgba(136,136,170,.3);color:var(--text-dim);display:block;}
+.status-box.err{background:var(--red-dim);border:1px solid var(--red-border);color:#ff8fa8;display:block;}
 .hint{font-size:11px;color:var(--text-dim);margin-top:14px;line-height:1.6;}
 .loading{color:var(--text-dim);font-size:13px;padding:20px 0;}
+.ver{font-size:10px;color:rgba(136,136,170,.4);letter-spacing:1px;margin-top:18px;}
 </style>
 </head>
 <body>
@@ -57,36 +86,49 @@ select:focus{border-color:var(--gold);}
   <div class="subtitle">INNER CIRCLE · EYES ONLY</div>
 
   <div class="caller-bar" id="callerBar"></div>
+  <div class="loading" id="loadingMsg">Connecting…</div>
 
-  <div class="loading" id="loadingMsg">Connecting...</div>
+  <div id="stepSignIn" style="display:none">
+    <p class="hint" style="margin:0 0 18px">Sign in so your vote counts as yours. Only Inner Circle members can vote.</p>
+    <button class="btn google" id="btnGoogle">Sign in with Google</button>
+  </div>
 
-  <div id="mainUI" style="display:none">
+  <div id="stepClaim" style="display:none">
+    <p class="hint" style="margin:0 0 16px">First time here — tell us which member you are. You only do this once.</p>
     <div class="select-wrap">
-      <label>YOUR NAME</label>
-      <select id="memberSelect">
-        <option value="">Loading members...</option>
-      </select>
+      <label>YOUR INNER CIRCLE NAME</label>
+      <select id="claimSelect"><option value="">Loading…</option></select>
     </div>
+    <button class="btn claim" id="btnClaim">Claim this name</button>
+    <div class="status-box" id="claimStatus"></div>
+    <p class="hint">Can't see your name? Jon hasn't added you yet — message him.</p>
+  </div>
 
-    <button class="btn-vote kill" id="btnKill" onclick="castVote('kill')">☠️ ACTIVATE KILL SWITCH</button>
-    <button class="btn-vote keep" id="btnKeep" onclick="castVote('keep')">🛡 SHIELD THIS CALLER</button>
-
+  <div id="stepVote" style="display:none">
+    <div class="who">Voting as <b id="whoName">—</b><button id="btnSignOut">sign out</button></div>
+    <button class="btn kill" id="btnKill">☠️ ACTIVATE KILL SWITCH</button>
+    <button class="btn keep" id="btnKeep">🛡 SHIELD THIS CALLER</button>
     <div class="live-tally" id="liveTally" style="display:none">
       <span class="seg kill">☠️ <span id="lt-kill">0</span></span>
       <span class="seg keep">🛡 <span id="lt-keep">0</span></span>
       <span class="seg net">NET <span id="lt-net">0</span>/<span id="lt-thresh">2</span></span>
     </div>
-
-    <button class="btn-vote withdraw" id="btnWithdraw" onclick="withdrawVote()" style="display:none">↩ Withdraw vote</button>
+    <button class="btn withdraw" id="btnWithdraw" style="display:none">↩ Withdraw vote</button>
     <div class="status-box" id="statusBox"></div>
-    <p class="hint" id="hintText">Each SHIELD cancels one KILL. Verdict fires when net kills hit threshold.</p>
+    <p class="hint" id="hintText">Each SHIELD cancels one KILL.</p>
   </div>
+
+  <div class="ver">Kill Switch v2.0</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, updateDoc, getDoc, deleteField }
+import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -98,235 +140,220 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-const voteDoc    = doc(db, "vote", "current");
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
+});
+const db   = getFirestore(app);
+const auth = getAuth(app);
+
+const stateDoc   = doc(db, "vote", "current");
+const votesCol   = collection(db, "vote", "current", "votes");
 const membersRef = doc(db, "config", "innerCircle");
+const namesCol   = collection(db, "memberNames");
 
-// ── Is anyone actually on screen? ──
-// The caller log writes "Caller Name" as a placeholder when the overlay is
-// cleared or Reset Stream runs, and the field is null on a fresh doc. Neither
-// counts as a live caller, so voting stays shut in both cases.
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+
+let me = null;
+let myName = null;
+let myVote = null;
+let state = {};
+let tally = { kill: 0, keep: 0, net: 0, killers: [], keepers: [] };
+let votesUnsub = null;
+
 const PLACEHOLDER_CALLER = "Caller Name";
-function hasActiveCaller(state) {
-  const c = ((state && state.caller) || "").trim();
+const hasActiveCaller = s => {
+  const c = ((s && s.caller) || "").trim();
   return !!c && c !== PLACEHOLDER_CALLER;
+};
+
+function show(step) {
+  $("loadingMsg").style.display = "none";
+  ["stepSignIn", "stepClaim", "stepVote"].forEach(id => {
+    $(id).style.display = (id === step) ? "block" : "none";
+  });
 }
 
-// ── Vote normalisation (legacy `true` == "kill") ──
-function normVote(v) {
-  if (v === true || v === "kill") return "kill";
-  if (v === "keep") return "keep";
-  return null;
-}
-function tallyVotes(votes) {
-  const killers = [], keepers = [];
-  for (const [name, v] of Object.entries(votes || {})) {
-    const nv = normVote(v);
-    if (nv === "kill") killers.push(name);
-    else if (nv === "keep") keepers.push(name);
-  }
-  return { killers, keepers, net: killers.length - keepers.length };
-}
-
-// ── Load member list dynamically ──
-async function loadMembers() {
-  try {
-    const snap = await getDoc(membersRef);
-    const members = snap.exists() ? (snap.data().members || []) : [];
-    const sel = document.getElementById("memberSelect");
-    sel.innerHTML = '<option value="">— Select your name —</option>';
-    members.forEach(m => {
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = m;
-      sel.appendChild(opt);
-    });
-    const saved = localStorage.getItem("ic_member");
-    if (saved && members.includes(saved)) sel.value = saved;
-    if (!members.length) {
-      sel.innerHTML = '<option value="">No members loaded yet</option>';
+$("btnGoogle").onclick = async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) {
+    console.error(e);
+    if (e.code !== "auth/popup-closed-by-user") {
+      alert("Sign-in failed. Check pop-ups aren't blocked, then try again.");
     }
-  } catch(e) {
-    console.error("Failed to load members", e);
+  }
+};
+$("btnSignOut").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  me = user;
+  myName = null;
+  if (votesUnsub) { votesUnsub(); votesUnsub = null; }
+  if (!user) { show("stepSignIn"); return; }
+
+  try {
+    const snap = await getDocs(namesCol);
+    snap.forEach(d => { if (d.data().uid === user.uid) myName = d.id; });
+  } catch (e) { console.error("[claims] read failed", e); }
+
+  if (myName) {
+    $("whoName").textContent = myName;
+    watchVotes();
+    show("stepVote");
+    render();
+  } else {
+    await fillClaimOptions();
+    show("stepClaim");
+  }
+});
+
+async function fillClaimOptions() {
+  const sel = $("claimSelect");
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const [memSnap, nameSnap] = await Promise.all([getDoc(membersRef), getDocs(namesCol)]);
+    const members = memSnap.exists() ? (memSnap.data().members || []) : [];
+    const taken = new Set();
+    nameSnap.forEach(d => taken.add(d.id));
+    const free = members.filter(m => !taken.has(m)).sort((a, b) => a.localeCompare(b));
+    sel.innerHTML = '<option value="">— Select your name —</option>';
+    free.forEach(m => {
+      const o = document.createElement("option");
+      o.value = m; o.textContent = m;
+      sel.appendChild(o);
+    });
+    if (!free.length) sel.innerHTML = '<option value="">No unclaimed names left</option>';
+  } catch (e) {
+    console.error("[claims] options failed", e);
+    sel.innerHTML = '<option value="">Couldn\'t load names</option>';
   }
 }
-loadMembers();
 
-let myVote = null;             // "kill" | "keep" | null
-let currentState = {};
-let memberName = localStorage.getItem("ic_member") || "";
-
-const sel = document.getElementById("memberSelect");
-if (memberName) sel.value = memberName;
-sel.addEventListener("change", () => {
-  memberName = sel.value;
-  if (memberName) localStorage.setItem("ic_member", memberName);
-  // Re-evaluate my vote against the new identity
-  myVote = normVote((currentState.votes || {})[memberName]);
-  renderVoteState();
-});
-
-// ── Listen to Firestore ──
-onSnapshot(voteDoc, snap => {
-  document.getElementById("loadingMsg").style.display = "none";
-  document.getElementById("mainUI").style.display = "block";
-
-  if (!snap.exists()) {
-    currentState = { votes: {}, threshold: 2, fired: false, caller: null };
-  } else {
-    currentState = snap.data();
+$("btnClaim").onclick = async () => {
+  const name = $("claimSelect").value;
+  const box = $("claimStatus");
+  if (!name) { box.className = "status-box err"; box.textContent = "Pick your name first."; return; }
+  $("btnClaim").disabled = true;
+  try {
+    await setDoc(doc(namesCol, name), {
+      uid: me.uid, email: me.email || "", claimedAt: serverTimestamp()
+    });
+    myName = name;
+    $("whoName").textContent = name;
+    watchVotes();
+    show("stepVote");
+    render();
+  } catch (e) {
+    console.error("[claim] failed", e);
+    box.className = "status-box err";
+    box.textContent = "That name was just claimed by someone else, or you're not allowed to claim it. Refresh and try again, or message Jon.";
+    $("btnClaim").disabled = false;
+    fillClaimOptions();
   }
+};
 
-  // Caller bar
-  const callerBar = document.getElementById("callerBar");
-  if (hasActiveCaller(currentState)) {
-    callerBar.innerHTML = `<span class="caller-name">📞 ${esc(currentState.caller)}</span>`;
-  } else {
-    callerBar.innerHTML = `<span class="caller-name none">— no caller on screen —</span>`;
-  }
+onSnapshot(stateDoc, snap => {
+  state = snap.exists() ? snap.data() : {};
+  render();
+}, e => console.error("[state]", e));
 
-  const thresh = currentState.threshold || 2;
-  const { killers, keepers, net } = tallyVotes(currentState.votes);
+function watchVotes() {
+  if (votesUnsub) votesUnsub();
+  votesUnsub = onSnapshot(votesCol, snap => {
+    const killers = [], keepers = [];
+    let mine = null;
+    snap.forEach(d => {
+      const v = d.data();
+      if (v.kind === "kill") killers.push(v.name || "?");
+      else if (v.kind === "keep") keepers.push(v.name || "?");
+      if (me && d.id === me.uid) mine = v.kind || null;
+    });
+    myVote = mine;
+    tally = {
+      kill: killers.length, keep: keepers.length,
+      net: killers.length - keepers.length, killers, keepers
+    };
+    render();
+  }, e => console.error("[votes]", e));
+}
 
-  // Live tally pills
-  document.getElementById("lt-kill").textContent   = killers.length;
-  document.getElementById("lt-keep").textContent   = keepers.length;
-  document.getElementById("lt-net").textContent    = net;
-  document.getElementById("lt-thresh").textContent = thresh;
-  document.getElementById("liveTally").style.display =
-    (killers.length || keepers.length) ? "flex" : "none";
-
-  // Hint
-  document.getElementById("hintText").textContent = hasActiveCaller(currentState)
-    ? `Each 🛡 cancels one ☠️. Verdict fires at net ${thresh}.`
-    : `Voting opens when a caller goes on screen.`;
-
-  // Reflect my vote state from Firestore (survives refresh)
-  myVote = normVote(memberName ? (currentState.votes || {})[memberName] : null);
-
-  if (currentState.fired) showFired();
-  else renderVoteState();
-});
-
-// ── Actions ──
 async function castVote(kind) {
-  memberName = sel.value;
-  if (!memberName) { alert("Please select your name first."); return; }
-  localStorage.setItem("ic_member", memberName);
+  if (!me || !myName || !hasActiveCaller(state)) return;
+  try {
+    await setDoc(doc(votesCol, me.uid), { name: myName, kind, at: serverTimestamp() });
+  } catch (e) {
+    console.error("[vote] failed", e);
+    const box = $("statusBox");
+    box.className = "status-box err";
+    box.textContent = "Your vote didn't save. If this keeps happening, message Jon.";
+  }
+}
+async function withdrawVote() {
+  if (!me) return;
+  try { await deleteDoc(doc(votesCol, me.uid)); }
+  catch (e) { console.error("[withdraw] failed", e); }
+}
+$("btnKill").onclick = () => castVote("kill");
+$("btnKeep").onclick = () => castVote("keep");
+$("btnWithdraw").onclick = withdrawVote;
 
-  const snap = await getDoc(voteDoc);
-  const data = snap.exists() ? snap.data() : { votes: {}, threshold: 2, fired: false };
+function render() {
+  const live = hasActiveCaller(state);
+  const thresh = state.threshold || 2;
 
-  // Re-check against fresh server state: the caller may have left between the
-  // tap and this round-trip, in which case the vote would land on nobody.
-  if (!hasActiveCaller(data)) {
-    console.warn("[vote] ignored — no caller on screen");
+  $("callerBar").innerHTML = live
+    ? `<span class="caller-name">📞 ${esc(state.caller)}</span>`
+    : `<span class="caller-name none">— no caller on screen —</span>`;
+
+  if (!me || !myName) return;
+
+  $("lt-kill").textContent = tally.kill;
+  $("lt-keep").textContent = tally.keep;
+  $("lt-net").textContent = tally.net;
+  $("lt-thresh").textContent = thresh;
+  $("liveTally").style.display = (tally.kill || tally.keep) ? "flex" : "none";
+
+  $("hintText").textContent = live
+    ? `Each 🛡 cancels one ☠️. Verdict at net ${thresh}.`
+    : "Voting opens when a caller goes on screen.";
+
+  const bKill = $("btnKill"), bKeep = $("btnKeep"), bWith = $("btnWithdraw"), box = $("statusBox");
+  [bKill, bKeep].forEach(b => { b.classList.remove("active", "idle"); b.disabled = false; });
+
+  if (live && tally.net >= thresh) {
+    box.className = "status-box fired";
+    box.innerHTML = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + tally.killers.map(esc).join(", ") + "</small>"
+      + (tally.keepers.length ? "<br><small style='opacity:.7'>Shielded in vain: " + tally.keepers.map(esc).join(", ") + "</small>" : "");
+    bKill.disabled = true; bKeep.disabled = true;
+    bWith.style.display = myVote ? "block" : "none";
     return;
   }
 
-  const votes = { ...(data.votes || {}) };
-  votes[memberName] = kind;
-
-  const { killers, keepers, net } = tallyVotes(votes);
-  const thresh = data.threshold || 2;
-  const shouldFire = net >= thresh;
-  // Once fired, stay fired until overlay resets — keep votes can't un-fire
-  const newFired = data.fired || shouldFire;
-  const firingNow = shouldFire && !data.fired;
-
-  await setDoc(voteDoc, {
-    ...data,
-    votes,
-    fired: newFired,
-    voters:    firingNow ? killers : (data.voters    || []),
-    defenders: firingNow ? keepers : (data.defenders || [])
-  }, { merge: true });
-
-  myVote = kind;
-}
-
-async function withdrawVote() {
-  memberName = sel.value;
-  if (!memberName) return;
-
-  try {
-    // Use dot-notation + deleteField so the subkey is actually removed.
-    // (setDoc with merge:true would leave the key intact — map fields merge per-key.)
-    await updateDoc(voteDoc, { [`votes.${memberName}`]: deleteField() });
-    myVote = null;
-  } catch(e) {
-    console.error("Withdraw failed:", e);
-  }
-}
-
-// ── UI helpers ──
-function renderVoteState() {
-  const btnKill = document.getElementById("btnKill");
-  const btnKeep = document.getElementById("btnKeep");
-  const btnWith = document.getElementById("btnWithdraw");
-  const box     = document.getElementById("statusBox");
-
-  btnKill.classList.remove("active");
-  btnKeep.classList.remove("active");
-  btnKill.classList.remove("idle");
-  btnKeep.classList.remove("idle");
-  btnKill.disabled = false;
-  btnKeep.disabled = false;
-
-  // No caller on screen — nothing to vote on. Shut both buttons.
-  if (!hasActiveCaller(currentState)) {
-    btnKill.disabled = true;
-    btnKeep.disabled = true;
-    btnKill.classList.add("idle");
-    btnKeep.classList.add("idle");
-    btnWith.style.display = "none";
+  if (!live) {
+    bKill.disabled = true; bKeep.disabled = true;
+    bKill.classList.add("idle"); bKeep.classList.add("idle");
+    bWith.style.display = "none";
     box.className = "status-box waiting";
     box.textContent = "⏳ Waiting for a caller to go on screen.";
     return;
   }
 
   if (myVote === "kill") {
-    btnKill.classList.add("active");
-    btnKill.disabled = true;
+    bKill.classList.add("active"); bKill.disabled = true;
     box.className = "status-box kill-voted";
     box.textContent = "☠️ KILL vote cast. Tap SHIELD to switch, or withdraw.";
-    btnWith.style.display = "block";
+    bWith.style.display = "block";
   } else if (myVote === "keep") {
-    btnKeep.classList.add("active");
-    btnKeep.disabled = true;
+    bKeep.classList.add("active"); bKeep.disabled = true;
     box.className = "status-box keep-voted";
     box.textContent = "🛡 SHIELD vote cast. Tap KILL to switch, or withdraw.";
-    btnWith.style.display = "block";
+    bWith.style.display = "block";
   } else {
-    box.className = "status-box";
-    box.style.display = "none";
-    btnWith.style.display = "none";
+    box.className = "status-box"; box.style.display = "none";
+    bWith.style.display = "none";
   }
 }
-
-function showFired() {
-  const voters    = currentState.voters    || [];
-  const defenders = currentState.defenders || [];
-  const box = document.getElementById("statusBox");
-  box.className = "status-box fired";
-  let html = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + voters.map(esc).join(", ") + "</small>";
-  if (defenders.length) {
-    html += "<br><small style='opacity:.7'>Shielded in vain: " + defenders.map(esc).join(", ") + "</small>";
-  }
-  box.innerHTML = html;
-  document.getElementById("btnKill").disabled = true;
-  document.getElementById("btnKeep").disabled = true;
-  document.getElementById("btnWithdraw").style.display = "none";
-}
-
-function esc(str) {
-  const d = document.createElement("div");
-  d.textContent = str;
-  return d.innerHTML;
-}
-
-window.castVote     = castVote;
-window.withdrawVote = withdrawVote;
 </script>
 </body>
 </html>

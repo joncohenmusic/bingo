@@ -2,11 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>Kill Switch — Verdict Overlay (v2.0)</title>
+<!--
+  ══════════════════════════════════════════════════════════════════════
+  KILL SWITCH VERDICT OVERLAY        v2.0            14 Aug 2026
+  ══════════════════════════════════════════════════════════════════════
+  CHANGELOG
+  v2.0  Rebuilt alongside Kill Switch v2.0.
+        · Reads vote/current/votes (one document per voter) instead of a
+          map inside vote/current.
+        · READ-ONLY. v1 reset the vote document three seconds after the
+          blast; an overlay with write access is a liability, so clearing
+          now happens in the Caller Log. Firestore rules deny writes here.
+        · The verdict is derived from the live tally rather than read from
+          a `fired` flag that any client could set.
+        · App Check + silent anonymous auth so it keeps reading once
+          enforcement is switched on.
+  v1.x  Read the votes map and the fired flag; wrote the reset itself.
+  ══════════════════════════════════════════════════════════════════════
+-->
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-family:system-ui,-apple-system,sans-serif;}
 
-/* Persistent counter — bottom right, appears when any vote activity */
 #vote-counter{
   position:fixed;bottom:80px;right:80px;
   background:rgba(8,8,15,.85);
@@ -24,7 +42,6 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
 .vc-divider{width:1px;height:34px;background:rgba(232,184,75,.35);}
 .vc-net-label{font-size:18px;color:#8888aa;letter-spacing:3px;margin-right:6px;font-weight:600;}
 
-/* Full verdict blast */
 #verdict-blast{
   position:fixed;inset:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -35,63 +52,27 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
 @keyframes blastIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 @keyframes blastOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.05)}}
 
-.blast-bg{
-  position:absolute;inset:0;
-  background:radial-gradient(ellipse at center,rgba(255,45,85,.2) 0%,transparent 65%);
-}
+.blast-bg{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,45,85,.2) 0%,transparent 65%);}
 .blast-icon{font-size:100px;margin-bottom:20px;animation:shake .5s ease .1s both;}
 @keyframes shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-10deg)}60%{transform:rotate(10deg)}80%{transform:rotate(-5deg)}}
-
-.blast-title{
-  font-size:80px;font-weight:900;letter-spacing:8px;
-  color:#ff2d55;
-  text-shadow:0 0 50px rgba(255,45,85,.9),0 0 100px rgba(255,45,85,.5);
-  margin-bottom:10px;
-}
-.blast-subtitle{
-  font-size:40px;color:rgba(240,240,255,.65);
-  letter-spacing:6px;text-transform:uppercase;margin-bottom:48px;
-}
-.blast-voters{
-  display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:1400px;
-}
-.voter-chip{
-  background:rgba(255,45,85,.15);
-  border:1px solid rgba(255,45,85,.55);
-  border-radius:50px;padding:18px 44px;
-  font-size:40px;font-weight:700;color:#ff8aaa;
-  letter-spacing:2px;
-  animation:chipIn .4s ease both;
-}
-.voter-chip.anon{
-  background:rgba(232,184,75,.1);
-  border:1px dashed rgba(232,184,75,.7);
-  color:#f0d488;
-}
+.blast-title{font-size:80px;font-weight:900;letter-spacing:8px;color:#ff2d55;
+  text-shadow:0 0 50px rgba(255,45,85,.9),0 0 100px rgba(255,45,85,.5);margin-bottom:10px;}
+.blast-subtitle{font-size:40px;color:rgba(240,240,255,.65);letter-spacing:6px;text-transform:uppercase;margin-bottom:48px;}
+.blast-voters{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;max-width:1400px;}
+.voter-chip{background:rgba(255,45,85,.15);border:1px solid rgba(255,45,85,.55);
+  border-radius:50px;padding:18px 44px;font-size:40px;font-weight:700;color:#ff8aaa;
+  letter-spacing:2px;animation:chipIn .4s ease both;}
+.voter-chip.anon{background:rgba(232,184,75,.1);border:1px dashed rgba(232,184,75,.7);color:#f0d488;}
 @keyframes chipIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
-#blast-defenders{
-  display:none;flex-direction:column;align-items:center;gap:16px;margin-top:42px;
-}
+#blast-defenders{display:none;flex-direction:column;align-items:center;gap:16px;margin-top:42px;}
 #blast-defenders.show{display:flex;}
-.defender-label{
-  font-size:22px;color:rgba(240,240,255,.45);
-  letter-spacing:5px;text-transform:uppercase;
-}
+.defender-label{font-size:22px;color:rgba(240,240,255,.45);letter-spacing:5px;text-transform:uppercase;}
 .defender-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:1400px;}
-.defender-chip{
-  background:rgba(61,214,140,.1);
-  border:1px solid rgba(61,214,140,.45);
-  border-radius:40px;padding:10px 28px;
-  font-size:24px;font-weight:600;color:#7feab0;
-  letter-spacing:1.5px;
-  animation:chipIn .4s ease both;
-}
-.defender-chip.anon{
-  background:rgba(232,184,75,.08);
-  border:1px dashed rgba(232,184,75,.6);
-  color:#f0d488;
-}
+.defender-chip{background:rgba(61,214,140,.1);border:1px solid rgba(61,214,140,.45);
+  border-radius:40px;padding:10px 28px;font-size:24px;font-weight:600;color:#7feab0;
+  letter-spacing:1.5px;animation:chipIn .4s ease both;}
+.defender-chip.anon{background:rgba(232,184,75,.08);border:1px dashed rgba(232,184,75,.6);color:#f0d488;}
 </style>
 </head>
 <body>
@@ -119,8 +100,12 @@ body{background:transparent;overflow:hidden;width:1920px;height:1080px;font-fami
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, updateDoc }
+import { getFirestore, doc, collection, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -132,102 +117,84 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-const voteDoc = doc(db, "vote", "current");
-
-let lastFired = false;
-let blastTimer = null;
-let blasting   = false;
-
-function normVote(v) {
-  if (v === true || v === "kill") return { kind: "kill", anon: false };
-  if (v === "keep") return { kind: "keep", anon: false };
-  if (v && typeof v === "object" && (v.kind === "kill" || v.kind === "keep")) {
-    return { kind: v.kind, anon: !!v.anon };
-  }
-  return null;
-}
-
-onSnapshot(voteDoc, snap => {
-  if (!snap.exists()) return;
-  const data = snap.data();
-  const votes = data.votes || {};
-
-  let killCount = 0, keepCount = 0;
-  for (const v of Object.values(votes)) {
-    const nv = normVote(v);
-    if (!nv) continue;
-    if (nv.kind === "kill") killCount++;
-    else if (nv.kind === "keep") keepCount++;
-  }
-  const net    = killCount - keepCount;
-  const thresh = data.threshold || 2;
-  const fired  = data.fired || false;
-
-  // Counter badge
-  document.getElementById("vc-kill").textContent   = killCount;
-  document.getElementById("vc-keep").textContent   = keepCount;
-  document.getElementById("vc-net").textContent    = net;
-  document.getElementById("vc-thresh").textContent = thresh;
-
-  const counter = document.getElementById("vote-counter");
-  const anyActivity = (killCount + keepCount) > 0;
-  if (anyActivity && !fired && !blasting) counter.classList.add("visible");
-  else counter.classList.remove("visible");
-
-  // Verdict blast — only trigger once per firing
-  if (fired && !lastFired) triggerBlast(data.voters || [], data.defenders || [], data.anonVoters || []);
-  if (!fired && lastFired && !blasting) dismissBlast();
-  lastFired = fired;
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
 });
+const db = getFirestore(app);
+signInAnonymously(getAuth(app)).catch(e => console.error("[auth]", e));
 
-function triggerBlast(voters, defenders, anonVoters) {
+const stateDoc = doc(db, "vote", "current");
+const votesCol = collection(db, "vote", "current", "votes");
+
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+
+let threshold = 2;
+let shown     = false;      // blast already played for this round
+let blasting  = false;
+let blastTimer = null;
+
+onSnapshot(stateDoc, snap => {
+  threshold = (snap.exists() && snap.data().threshold) || 2;
+  $("vc-thresh").textContent = threshold;
+}, e => console.error("[state]", e));
+
+onSnapshot(votesCol, snap => {
+  const killers = [], keepers = [], anon = new Set();
+  snap.forEach(d => {
+    const v = d.data();
+    const name = v.name || "?";
+    if (v.anon) anon.add(name);
+    if (v.kind === "kill") killers.push(name);
+    else if (v.kind === "keep") keepers.push(name);
+  });
+
+  const net = killers.length - keepers.length;
+  $("vc-kill").textContent = killers.length;
+  $("vc-keep").textContent = keepers.length;
+  $("vc-net").textContent  = net;
+
+  const fired = net >= threshold && killers.length > 0;
+  const activity = killers.length + keepers.length > 0;
+
+  $("vote-counter").classList.toggle("visible", activity && !fired && !blasting);
+
+  // Fire once per round. Clearing the votes in the Caller Log resets this.
+  if (fired && !shown) { shown = true; triggerBlast(killers, keepers, anon); }
+  if (!activity) { shown = false; if (blasting) dismissBlast(); }
+}, e => console.error("[votes]", e));
+
+function triggerBlast(killers, keepers, anon) {
   blasting = true;
-  const blast    = document.getElementById("verdict-blast");
-  const votersEl = document.getElementById("blast-voters");
-  const anonSet  = new Set(anonVoters || []);
+  $("blast-voters").innerHTML = killers.map((v, i) =>
+    `<div class="voter-chip${anon.has(v) ? " anon" : ""}" style="animation-delay:${0.3 + i * 0.1}s">`
+    + (anon.has(v) ? "🎭 MYSTERY MEMBER" : "⚡ " + esc(v)) + "</div>").join("");
 
-  votersEl.innerHTML = voters.map((v, i) => {
-    const isAnon = anonSet.has(v);
-    const label  = isAnon ? "🎭 MYSTERY MEMBER" : `⚡ ${esc(v)}`;
-    return `<div class="voter-chip${isAnon ? ' anon' : ''}" style="animation-delay:${0.3 + i * 0.1}s">${label}</div>`;
-  }).join("");
-
-  const defendersWrap = document.getElementById("blast-defenders");
-  const defendersRow  = document.getElementById("defender-row");
-  if (defenders.length) {
-    defendersRow.innerHTML = defenders.map((v, i) => {
-      const isAnon = anonSet.has(v);
-      const label  = isAnon ? "🎭 MYSTERY MEMBER" : `🛡 ${esc(v)}`;
-      return `<div class="defender-chip${isAnon ? ' anon' : ''}" style="animation-delay:${0.6 + i * 0.1}s">${label}</div>`;
-    }).join("");
-    defendersWrap.classList.add("show");
+  const wrap = $("blast-defenders");
+  if (keepers.length) {
+    $("defender-row").innerHTML = keepers.map((v, i) =>
+      `<div class="defender-chip${anon.has(v) ? " anon" : ""}" style="animation-delay:${0.6 + i * 0.1}s">`
+      + (anon.has(v) ? "🎭 MYSTERY MEMBER" : "🛡 " + esc(v)) + "</div>").join("");
+    wrap.classList.add("show");
   } else {
-    defendersWrap.classList.remove("show");
+    wrap.classList.remove("show");
   }
 
-  blast.className = "active";
-  const snd = new Audio("https://joncohenmusic.github.io/bingo/verdict.mp3");
-  snd.play().catch(() => {});
-  // Reset Firestore after 3s
-  setTimeout(() => {
-    updateDoc(voteDoc, { fired: false, votes: {}, voters: [], defenders: [], anonVoters: [] }).catch(() => {});
-  }, 3000);
+  $("verdict-blast").className = "active";
+  new Audio("https://joncohenmusic.github.io/bingo/verdict.mp3").play().catch(() => {});
+
+  // No Firestore write here — v1 reset the document from the overlay, which
+  // meant an OBS page needed write access. Clear it from the Caller Log.
   if (blastTimer) clearTimeout(blastTimer);
   blastTimer = setTimeout(dismissBlast, 10000);
 }
 
 function dismissBlast() {
   blasting = false;
-  const blast = document.getElementById("verdict-blast");
-  blast.className = "out";
-  setTimeout(() => { blast.className = ""; }, 600);
-}
-
-function esc(str) {
-  const d = document.createElement("div");
-  d.textContent = str;
-  return d.innerHTML;
+  const b = $("verdict-blast");
+  b.className = "out";
+  setTimeout(() => { b.className = ""; }, 600);
 }
 </script>
 </body>

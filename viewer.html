@@ -85,6 +85,9 @@ body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -95,8 +98,21 @@ const firebaseConfig = {
   appId: "1:1054324566020:web:dc6739c69458011efe2d51"
 };
 
-const AUTO_APPROVE = ["jon","joncohen","theunconvinced"];
+// v2.0: AUTO_APPROVE removed. Marking a square directly is now impossible
+// from this page — every call goes to the pending queue for Jon to approve.
 const app = initializeApp(firebaseConfig);
+// ── Security layer (v2.0) ───────────────────────────────────────────────
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
+});
+const auth = getAuth(app);
+let myUid = null;
+const authReady = new Promise((resolve, reject) => {
+  onAuthStateChanged(auth, u => { if (u) { myUid = u.uid; resolve(u); } });
+  signInAnonymously(auth).catch(err => { console.error("[auth] sign-in failed", err); reject(err); });
+});
+
 const db  = getFirestore(app);
 
 let username = "", boardSquares = [], markedCells = {}, pendingCells = {};
@@ -169,7 +185,7 @@ function startListening() {
   });
   onSnapshot(collection(db,'games','current','pending'), function(snap) {
     pendingCells = {};
-    snap.forEach(function(d){ pendingCells[d.data().cellIndex] = { id: d.id, username: d.data().username || '' }; });
+    snap.forEach(function(d){ pendingCells[d.data().cellIndex] = { id: d.id, username: d.data().username || '', uid: d.data().uid || '' }; });
     initialLoad = false;
     buildBoard();
   });
@@ -201,8 +217,9 @@ function buildBoard() {
       cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-caller">@'+esc(caller.replace(/^@/,''))+'</span>';
     } else if (isPend) {
       cell.classList.add('pending');
-      const pendUser = (pendingCells[i].username || '').toLowerCase();
-      const mine = pendUser === username.toLowerCase();
+      // v2.0: "mine" is now the Firebase identity, not a typed name, so you
+      // can no longer cancel someone else's call by copying their username.
+      const mine = !!myUid && pendingCells[i].uid === myUid;
       if (mine) {
         cell.classList.add('mine');
         cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting — tap to cancel</span>';
@@ -223,28 +240,22 @@ function buildBoard() {
 
 async function submitCell(gridIndex, text) {
   if (!username || markedCells[String(gridIndex)] || pendingCells[gridIndex]!==undefined) return;
-  const isAutoApprove = AUTO_APPROVE.includes(username.toLowerCase());
-  if (isAutoApprove) {
-    try {
-      const upd = {}; upd['markedCells.'+gridIndex] = { username: username, caller: currentCaller || null };
-      await updateDoc(doc(db,'games','current'), upd);
-      showStatus('"'+text.replace(/\n/g,' ')+'" marked! 🎯');
-    } catch(e) { showStatus('⚠️ Connection error — try again'); }
-  } else {
-    try {
-      await addDoc(collection(db,'games','current','pending'), {
-        cellIndex: gridIndex, username, squareText: text,
-        caller: currentCaller || null,
-        submittedAt: serverTimestamp()
-      });
-      showStatus('"'+text.replace(/\n/g,' ')+'" called — waiting for Jon! 👀');
-    } catch(e) { showStatus('⚠️ Connection error — try again'); }
-  }
+  await authReady;
+  if (!myUid) { showStatus('⚠️ Not connected yet — try again'); return; }
+  try {
+    await addDoc(collection(db,'games','current','pending'), {
+      cellIndex: gridIndex, username, squareText: text,
+      caller: currentCaller || null,
+      uid: myUid,
+      submittedAt: serverTimestamp()
+    });
+    showStatus('"'+text.replace(/\n/g,' ')+'" called — waiting for Jon! 👀');
+  } catch(e) { showStatus('⚠️ Connection error — try again'); }
 }
 
 async function withdrawCell(gridIndex) {
   const pend = pendingCells[gridIndex];
-  if (!pend || (pend.username||'').toLowerCase() !== username.toLowerCase()) return;
+  if (!pend || !myUid || pend.uid !== myUid) return;
   try {
     await deleteDoc(doc(db,'games','current','pending', pend.id));
     showStatus('Call withdrawn ↩');
