@@ -551,6 +551,8 @@ body {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, collection }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
@@ -562,6 +564,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// ── v1.1 security: App Check + a silent identity, so this overlay keeps
+// reading once App Check enforcement is switched on. Read-only page. ──
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
+  isTokenAutoRefreshEnabled: true
+});
+signInAnonymously(getAuth(app)).catch(e => console.error("[auth]", e));
 const db  = getFirestore(app);
 const stateRef = doc(db, "rateThisCaller", "state");
 const votesRef = collection(db, "rateThisCaller", "state", "votes");
