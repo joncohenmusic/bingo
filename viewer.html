@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Believer Bingo – The Unconvinced</title>
+<title>Believer Bingo v2.1 – The Unconvinced</title>
 <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0a1a;--cell-bg:#1a1a3e;--cell-hover:#252560;--neon-pink:#ff2d55;--neon-blue:#00d4ff;--neon-green:#39ff14;--neon-yellow:#ffe600;--neon-purple:#bf5fff;--text:#f0f0ff;--text-dim:#8888aa;--gold:#ffd700;}
@@ -83,7 +83,7 @@ body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp }
+import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -101,7 +101,11 @@ const firebaseConfig = {
 // v2.0: AUTO_APPROVE removed. Marking a square directly is now impossible
 // from this page — every call goes to the pending queue for Jon to approve.
 const app = initializeApp(firebaseConfig);
-// ── Security layer (v2.0) ───────────────────────────────────────────────
+// ── Security layer (v2.1) ───────────────────────────────────────────────
+// v2.1: a pending call is now stored at pending/{uid} instead of an auto-id
+// document, so one account can hold only one unapproved call at a time.
+// Flooding the board now costs one Google/anonymous account per call, and the
+// rules enforce a minimum gap between replacements.
 initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
   isTokenAutoRefreshEnabled: true
@@ -238,26 +242,50 @@ function buildBoard() {
   requestAnimationFrame(fitCellText);
 }
 
+// v2.1: returns the grid index of this account's outstanding call, or null.
+function myPendingIndex() {
+  if (!myUid) return null;
+  for (const k in pendingCells) {
+    if (pendingCells[k].uid === myUid) return Number(k);
+  }
+  return null;
+}
+
 async function submitCell(gridIndex, text) {
   if (!username || markedCells[String(gridIndex)] || pendingCells[gridIndex]!==undefined) return;
   await authReady;
   if (!myUid) { showStatus('⚠️ Not connected yet — try again'); return; }
+  // v2.1: one outstanding call per account. Tap your own pending square to
+  // withdraw it first — this is what stops a single account filling the board.
+  const mine = myPendingIndex();
+  if (mine !== null) {
+    showStatus('⏳ You already have a call waiting — tap it to cancel first');
+    return;
+  }
   try {
-    await addDoc(collection(db,'games','current','pending'), {
+    // v2.1: document id is the account id, so the rules can enforce one per account.
+    await setDoc(doc(db,'games','current','pending', myUid), {
       cellIndex: gridIndex, username, squareText: text,
       caller: currentCaller || null,
       uid: myUid,
       submittedAt: serverTimestamp()
     });
     showStatus('"'+text.replace(/\n/g,' ')+'" called — waiting for Jon! 👀');
-  } catch(e) { showStatus('⚠️ Connection error — try again'); }
+  } catch(e) {
+    if (e && e.code === 'permission-denied') {
+      showStatus('⏳ Slow down a moment, then try again');
+    } else {
+      showStatus('⚠️ Connection error — try again');
+    }
+  }
 }
 
 async function withdrawCell(gridIndex) {
   const pend = pendingCells[gridIndex];
   if (!pend || !myUid || pend.uid !== myUid) return;
   try {
-    await deleteDoc(doc(db,'games','current','pending', pend.id));
+    // v2.1: the document id is the account id.
+    await deleteDoc(doc(db,'games','current','pending', myUid));
     showStatus('Call withdrawn ↩');
   } catch(e) { showStatus('⚠️ Couldn\'t withdraw — try again'); }
 }

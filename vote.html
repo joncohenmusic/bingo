@@ -3,12 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inner Circle — The Kill Switch (v2.1)</title>
+<title>Inner Circle — The Kill Switch (v2.2)</title>
 <!--
   ══════════════════════════════════════════════════════════════════════
-  THE KILL SWITCH                    v2.0            14 Aug 2026
+  THE KILL SWITCH                    v2.2            17 Aug 2026
   ══════════════════════════════════════════════════════════════════════
   CHANGELOG
+  v2.2  Fix: the one-claim-per-account rule was never actually in force. The
+        rules refused a claim if memberClaims/{uid} existed — but nothing ever
+        wrote that document, so the check was always true and one Google
+        account could claim every name on the list, then vote as all of them.
+        The claim is now a single batched write of both documents, and the
+        rules use getAfter() to require them together.
   v2.1  Fix: the page treated ANY signed-in user as authenticated. Because
         Firebase shares an auth session across the whole domain, a visitor who
         had opened bingo or rate.html already had a silent anonymous account,
@@ -126,12 +132,12 @@ select:focus{border-color:var(--gold);}
     <p class="hint" id="hintText">Each SHIELD cancels one KILL.</p>
   </div>
 
-  <div class="ver">Kill Switch v2.1</div>
+  <div class="ver">Kill Switch v2.2</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp }
+import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, deleteDoc, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { initializeAppCheck, ReCaptchaV3Provider }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
@@ -256,9 +262,17 @@ $("btnClaim").onclick = async () => {
   if (!name) { box.className = "status-box err"; box.textContent = "Pick your name first."; return; }
   $("btnClaim").disabled = true;
   try {
-    await setDoc(doc(namesCol, name), {
+    // v2.2: both documents in one batch. The rules use getAfter() to require
+    // the pair, so a client that skips the register entry can no longer claim
+    // a second name.
+    const batch = writeBatch(db);
+    batch.set(doc(namesCol, name), {
       uid: me.uid, email: me.email || "", claimedAt: serverTimestamp()
     });
+    batch.set(doc(db, "memberClaims", me.uid), {
+      name, claimedAt: serverTimestamp()
+    });
+    await batch.commit();
     myName = name;
     $("whoName").textContent = name;
     watchVotes();

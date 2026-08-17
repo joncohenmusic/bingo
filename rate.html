@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0a0904">
-<title>Rate This Caller — The Unconvinced</title>
+<title>Rate This Caller v2.1 — The Unconvinced</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -756,7 +756,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-// ── Security layer (v2.0) ───────────────────────────────────────────────
+// ── Security layer (v2.1) ───────────────────────────────────────────────
+// v2.1: client write cadence throttled to match the server-side rate limit
+//       in the Firestore rules. See MIN_WRITE_INTERVAL_MS below.
 // App Check: Firestore rejects any request without a token proving it came
 // from this page in a real browser. Scripts pointed at the database fail.
 // Anonymous auth: silent, no login prompt, but gives this browser a real
@@ -790,7 +792,15 @@ let isLocked = false;
 let userPos = { x: 0, y: 0 };          // axis units, −10..+10
 let plotRect = null;                   // cached on resize/start of drag
 let pendingWriteTimer = null;
-const WRITE_DEBOUNCE_MS = 220;
+// v2.1: the rules refuse a second write to the same vote document inside
+// MIN_WRITE_INTERVAL_MS. The client throttles to the same cadence (plus a
+// safety margin for clock skew) so legitimate dragging is never denied.
+// If you change one of these, change the other.
+const MIN_WRITE_INTERVAL_MS = 1000;   // must match duration.value(1,'s') in rules
+const WRITE_MARGIN_MS       = 250;    // clock-skew headroom
+const WRITE_THROTTLE_MS     = MIN_WRITE_INTERVAL_MS + WRITE_MARGIN_MS;
+let lastWriteAt   = 0;                // when the last accepted write went out
+let pendingCoords = null;             // latest position waiting to be sent
 
 // ── DOM ───────────────────────────────────────────────
 const plot         = document.getElementById("plot");
@@ -955,34 +965,50 @@ window.addEventListener("pointercancel", onPointerUp);
 window.addEventListener("resize", () => { plotRect = null; paintUserDot(); });
 
 // ── Write to Firestore (debounced) ────────────────────
+// v2.1: trailing-edge throttle. At most one write per WRITE_THROTTLE_MS, and
+// the final position is always sent — dragging still feels live locally because
+// the user's own dot is painted from userPos, not from the round trip.
 function scheduleWrite() {
-  if (pendingWriteTimer) return;
+  const wait = Math.max(0, WRITE_THROTTLE_MS - (Date.now() - lastWriteAt));
+  if (pendingWriteTimer) return;        // a trailing write is already queued
+  if (wait === 0) { pushVote(); return; }
   pendingWriteTimer = setTimeout(() => {
     pendingWriteTimer = null;
     pushVote();
-  }, WRITE_DEBOUNCE_MS);
+  }, wait);
 }
 function flushWrite() {
-  if (pendingWriteTimer) {
-    clearTimeout(pendingWriteTimer);
+  // Never fire immediately — that is what used to breach the interval on
+  // pointerup. Queue the final position instead.
+  if (pendingWriteTimer) return;
+  const wait = Math.max(0, WRITE_THROTTLE_MS - (Date.now() - lastWriteAt));
+  pendingWriteTimer = setTimeout(() => {
     pendingWriteTimer = null;
-  }
-  pushVote();
+    pushVote();
+  }, wait);
 }
 async function pushVote() {
   if (!displayName || !currentSessionId || isLocked) return;
   await authReady;
   if (!voteRef) return;
   try {
+    lastWriteAt = Date.now();          // v2.1: stamp before awaiting
     await setDoc(voteRef, {
-      displayName,
+      displayName: String(displayName).slice(0, 24),
       substance: userPos.y,
       goodFaith: userPos.x,
       sessionId: currentSessionId,
       updatedAt: serverTimestamp(),
     });
   } catch (err) {
-    console.error("vote write failed", err);
+    // v2.1: a permission-denied here means the rate limit caught us. Not fatal —
+    // the trailing throttle will resend the current position shortly.
+    if (err && err.code === "permission-denied") {
+      console.warn("vote write throttled by rules; will retry");
+      scheduleWrite();
+    } else {
+      console.error("vote write failed", err);
+    }
   }
 }
 
