@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Interactive Tools — Offline · The Unconvinced (v1.0)</title>
+<title>Interactive Tools — Offline · The Unconvinced (v1.1)</title>
 <meta name="robots" content="noindex">
 <!--
   ════════════════════════════════════════════════════════════════
-  THE UNCONVINCED — interactive tools holding page      v1.0
+  THE UNCONVINCED — interactive tools holding page      v1.1
   18–20 Aug 2026
 
   Deploy as rate.html, viewer.html and vote.html (three copies of
@@ -18,6 +18,7 @@
   nothing to serve however many people load it.
 
   CHANGELOG
+  v1.1  Removed the channel link from the footer.
   v1.0  First build. Static page, no scripts touching Firestore.
   ════════════════════════════════════════════════════════════════
 -->
@@ -30,7 +31,6 @@
     --panel:#111827;
     --line:#1F2A3E;
     --gold:#E8A33D;
-    --gold-dim:#8A6524;
     --bone:#D6DEEC;
     --muted:#6B7A94;
     --troll:#E5484D;
@@ -99,10 +99,6 @@
   dd{margin:0;color:#AEBACE}
 
   footer{font-size:12px;color:var(--muted)}
-  footer a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--gold-dim);
-     padding-bottom:1px}
-  footer a:hover{border-bottom-color:var(--gold)}
-  footer a:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:2px}
 
   @media(prefers-reduced-motion:reduce){
     .dot{animation:none}
@@ -199,7 +195,6 @@
 
   <footer>
     Members, watch this space — you'll hear first.
-    <a href="https://www.youtube.com/@TheUnconvinced">Back to the channel →</a>
   </footer>
 
 </main>
