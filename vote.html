@@ -1,393 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inner Circle — The Kill Switch (v2.2)</title>
+<title>Interactive Tools — Offline · The Unconvinced (v1.0)</title>
+<meta name="robots" content="noindex">
 <!--
-  ══════════════════════════════════════════════════════════════════════
-  THE KILL SWITCH                    v2.2            17 Aug 2026
-  ══════════════════════════════════════════════════════════════════════
+  ════════════════════════════════════════════════════════════════
+  THE UNCONVINCED — interactive tools holding page      v1.0
+  18–20 Aug 2026
+
+  Deploy as rate.html, viewer.html and vote.html (three copies of
+  this same file) so every existing link and QR code lands here.
+
+  Contains NO Firebase SDK and makes no network calls beyond the
+  webfont. It cannot read or write the database, so it costs
+  nothing to serve however many people load it.
+
   CHANGELOG
-  v2.2  Fix: the one-claim-per-account rule was never actually in force. The
-        rules refused a claim if memberClaims/{uid} existed — but nothing ever
-        wrote that document, so the check was always true and one Google
-        account could claim every name on the list, then vote as all of them.
-        The claim is now a single batched write of both documents, and the
-        rules use getAfter() to require them together.
-  v2.1  Fix: the page treated ANY signed-in user as authenticated. Because
-        Firebase shares an auth session across the whole domain, a visitor who
-        had opened bingo or rate.html already had a silent anonymous account,
-        so vote.html skipped Google sign-in and let them claim a member name.
-        Now it uses its own named Firebase app (separate auth state) and
-        explicitly rejects anonymous sessions. Also shows which Google account
-        you're signed in as, so a member can tell they've used the right one.
-  v2.0  Rebuilt after the 13 Aug attack, in which 25 kill votes were cast
-        under real members' names.
-        · App Check — Firestore refuses requests that didn't come from
-          this page in a real browser, so scripts can't vote at all.
-        · Google sign-in — no more picking any name from a dropdown.
-        · Name claiming — each member claims their Inner Circle name once;
-          the claim lives at memberNames/{name} and can't be taken by
-          anyone else, because rules reject a create on an existing doc.
-        · One vote document per account at vote/current/votes/{uid}.
-          Rules check the claim, so you can only vote as yourself.
-        · The `fired` flag is no longer written by voters — the tally is
-          derived on read, so nobody can force or suppress a verdict.
-  v1.x  Dropdown of member names, votes stored as a map in vote/current.
-  ══════════════════════════════════════════════════════════════════════
+  v1.0  First build. Static page, no scripts touching Firestore.
+  ════════════════════════════════════════════════════════════════
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-:root{
-  --bg:#08080f;--panel:#12122a;
-  --gold:#e8b84b;--gold-dim:rgba(232,184,75,.15);--gold-border:rgba(232,184,75,.35);
-  --red:#ff2d55;--red-dim:rgba(255,45,85,.12);--red-border:rgba(255,45,85,.4);
-  --keep:#3dd68c;--keep-dim:rgba(61,214,140,.12);--keep-border:rgba(61,214,140,.4);
-  --green:#39ff14;--green-dim:rgba(57,255,20,.1);--green-border:rgba(57,255,20,.35);
-  --text:#f0f0ff;--text-dim:#8888aa;
-}
-body{background:var(--bg);font-family:system-ui,-apple-system,sans-serif;color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-.card{background:var(--panel);border:1px solid var(--gold-border);border-radius:20px;padding:32px 28px;max-width:380px;width:100%;text-align:center;}
-.crown{font-size:40px;margin-bottom:8px;}
-h1{font-size:22px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
-.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:26px;}
-.caller-bar{min-height:22px;margin-bottom:20px;}
-.caller-name{color:var(--gold);font-size:12px;letter-spacing:1px;background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px;display:inline-block;}
-.caller-name.none{color:var(--text-dim);background:rgba(136,136,170,.08);border-color:rgba(136,136,170,.25);}
-.select-wrap{margin-bottom:20px;text-align:left;}
-label{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text-dim);display:block;margin-bottom:8px;}
-select{width:100%;background:#0d0d22;border:1px solid var(--gold-border);border-radius:10px;color:var(--text);padding:13px 16px;font-size:15px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;}
-select:focus{border-color:var(--gold);}
-.btn{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:1px;cursor:pointer;border:2px solid;transition:all .2s;margin-bottom:10px;font-family:inherit;}
-.btn.google{background:#fff;color:#1f1f1f;border-color:#fff;font-size:15px;}
-.btn.google:hover{opacity:.9;}
-.btn.claim{background:var(--gold-dim);border-color:var(--gold);color:var(--gold);}
-.btn.claim:hover:not(:disabled){background:var(--gold);color:#1a1200;}
-.btn.kill{background:var(--red-dim);border-color:var(--red);color:var(--red);}
-.btn.kill:hover:not(:disabled){background:var(--red);color:#fff;}
-.btn.keep{background:var(--keep-dim);border-color:var(--keep);color:var(--keep);}
-.btn.keep:hover:not(:disabled){background:var(--keep);color:#062818;}
-.btn.active{opacity:.5;cursor:default;}
-.btn.idle{opacity:.3;filter:grayscale(1);}
-.btn.withdraw{background:transparent;border-color:var(--gold-border);color:var(--text-dim);font-size:13px;padding:11px;margin-top:8px;}
-.btn.withdraw:hover:not(:disabled){border-color:var(--gold);color:var(--gold);}
-.btn:disabled{cursor:not-allowed;}
-.who{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:18px;flex-wrap:wrap;}
-.who b{color:var(--gold);font-weight:700;}
-.who button{background:none;border:none;color:var(--text-dim);font-size:11px;text-decoration:underline;cursor:pointer;font-family:inherit;}
-.live-tally{display:flex;justify-content:center;gap:14px;font-size:11px;letter-spacing:1px;color:var(--text-dim);margin:14px 0 4px;font-weight:600;}
-.live-tally .seg{display:flex;align-items:center;gap:5px;}
-.live-tally .seg.kill{color:var(--red);}
-.live-tally .seg.keep{color:var(--keep);}
-.live-tally .seg.net{color:var(--gold);}
-.status-box{margin-top:16px;padding:14px;border-radius:10px;font-size:13px;font-weight:600;display:none;line-height:1.6;}
-.status-box.kill-voted{background:var(--red-dim);border:1px solid var(--red-border);color:var(--red);display:block;}
-.status-box.keep-voted{background:var(--keep-dim);border:1px solid var(--keep-border);color:var(--keep);display:block;}
-.status-box.fired{background:var(--green-dim);border:1px solid var(--green-border);color:var(--green);display:block;}
-.status-box.waiting{background:rgba(136,136,170,.08);border:1px solid rgba(136,136,170,.3);color:var(--text-dim);display:block;}
-.status-box.err{background:var(--red-dim);border:1px solid var(--red-border);color:#ff8fa8;display:block;}
-.hint{font-size:11px;color:var(--text-dim);margin-top:14px;line-height:1.6;}
-.loading{color:var(--text-dim);font-size:13px;padding:20px 0;}
-.ver{font-size:10px;color:rgba(136,136,170,.4);letter-spacing:1px;margin-top:18px;}
+  :root{
+    --ink:#0A0E17;
+    --panel:#111827;
+    --line:#1F2A3E;
+    --gold:#E8A33D;
+    --gold-dim:#8A6524;
+    --bone:#D6DEEC;
+    --muted:#6B7A94;
+    --troll:#E5484D;
+    --disp:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink);color:var(--bone)}
+  body{
+    font-family:var(--mono);font-size:14px;line-height:1.65;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:40px 22px;
+    background-image:radial-gradient(ellipse 80% 55% at 50% 0%,#131C2E 0%,var(--ink) 70%);
+  }
+  .card{width:100%;max-width:660px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--troll);
+    box-shadow:0 0 0 3px rgba(229,72,77,.16);
+    animation:breathe 2.6s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+  h1{
+    font-family:var(--disp);font-weight:700;
+    font-size:clamp(42px,10vw,76px);line-height:.93;letter-spacing:.005em;
+    text-transform:uppercase;margin:0 0 20px;color:#F1F5FC;
+  }
+  h1 em{font-style:normal;color:var(--gold);display:block}
+
+  .lede{font-size:14.5px;color:#AEBACE;max-width:52ch;margin:0 0 34px}
+  .lede strong{color:var(--bone);font-weight:500}
+
+  /* ── signature: the matrix, turned on the visitor ── */
+  figure{margin:0 0 34px;border:1px solid var(--line);border-radius:4px;
+     background:var(--panel);overflow:hidden}
+  .figtop{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:13px 16px;border-bottom:1px solid var(--line);
+  }
+  .figtop span:first-child{
+    font-family:var(--disp);font-size:17px;font-weight:600;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--gold);
+  }
+  .figtop span:last-child{font-size:10px;letter-spacing:.16em;
+     text-transform:uppercase;color:var(--muted)}
+  svg{display:block;width:100%;height:auto}
+  figcaption{
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:12px 16px;border-top:1px solid var(--line);
+    font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+  }
+  figcaption b{color:var(--troll);font-weight:500;letter-spacing:.15em}
+
+  .rule{height:1px;background:var(--line);margin:0 0 26px}
+
+  dl{margin:0 0 30px;display:grid;grid-template-columns:auto 1fr;gap:9px 20px;
+     font-size:12.5px}
+  dt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+     color:var(--muted);padding-top:3px}
+  dd{margin:0;color:#AEBACE}
+
+  footer{font-size:12px;color:var(--muted)}
+  footer a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--gold-dim);
+     padding-bottom:1px}
+  footer a:hover{border-bottom-color:var(--gold)}
+  footer a:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:2px}
+
+  @media(prefers-reduced-motion:reduce){
+    .dot{animation:none}
+    #visitor{animation:none}
+  }
+  #visitor{animation:settle 1.1s cubic-bezier(.22,1,.36,1) both}
+  @keyframes settle{
+    from{transform:translate(120px,-90px);opacity:0}
+    to{transform:translate(0,0);opacity:1}
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="crown">⚖️</div>
-  <h1>THE KILL SWITCH</h1>
-  <div class="subtitle">INNER CIRCLE · EYES ONLY</div>
+<main class="card">
 
-  <div class="caller-bar" id="callerBar"></div>
-  <div class="loading" id="loadingMsg">Connecting…</div>
+  <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Interactive tools · offline</p>
 
-  <div id="stepSignIn" style="display:none">
-    <p class="hint" style="margin:0 0 18px">Sign in so your vote counts as yours. Only Inner Circle members can vote.</p>
-    <button class="btn google" id="btnGoogle">Sign in with Google</button>
-  </div>
+  <h1>Back when<em>they're built</em></h1>
 
-  <div id="stepClaim" style="display:none">
-    <p class="hint" style="margin:0 0 6px" id="claimAcct"></p>
-    <p class="hint" style="margin:0 0 16px">First time here — tell us which member you are. You only do this once.</p>
-    <div class="select-wrap">
-      <label>YOUR INNER CIRCLE NAME</label>
-      <select id="claimSelect"><option value="">Loading…</option></select>
+  <p class="lede">Believer Bingo, Rate My Caller and the Kill Switch are switched
+    off while the whole thing is rebuilt from the ground up. <strong>They will
+    be back.</strong> Properly this time, rather than patched between streams.</p>
+
+  <figure>
+    <div class="figtop">
+      <span>Rate This Caller</span>
+      <span>Final session · 1 voter</span>
     </div>
-    <button class="btn claim" id="btnClaim">Claim this name</button>
-    <div class="status-box" id="claimStatus"></div>
-    <p class="hint">Can't see your name? Jon hasn't added you yet — message him.</p>
-  </div>
 
-  <div id="stepVote" style="display:none">
-    <div class="who">Voting as <b id="whoName">—</b><span id="voteAcct" style="opacity:.6"></span><button id="btnSignOut">sign out</button></div>
-    <button class="btn kill" id="btnKill">☠️ ACTIVATE KILL SWITCH</button>
-    <button class="btn keep" id="btnKeep">🛡 SHIELD THIS CALLER</button>
-    <div class="live-tally" id="liveTally" style="display:none">
-      <span class="seg kill">☠️ <span id="lt-kill">0</span></span>
-      <span class="seg keep">🛡 <span id="lt-keep">0</span></span>
-      <span class="seg net">NET <span id="lt-net">0</span>/<span id="lt-thresh">2</span></span>
-    </div>
-    <button class="btn withdraw" id="btnWithdraw" style="display:none">↩ Withdraw vote</button>
-    <div class="status-box" id="statusBox"></div>
-    <p class="hint" id="hintText">Each SHIELD cancels one KILL.</p>
-  </div>
+    <svg viewBox="0 0 660 340" role="img"
+         aria-label="Rating matrix with a single dot placed at the extreme troll, no-substance corner, labelled our visitor.">
+      <defs>
+        <linearGradient id="q" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1A2438"/>
+          <stop offset="100%" stop-color="#131B2B"/>
+        </linearGradient>
+      </defs>
+      <rect x="70" y="26" width="520" height="288" fill="url(#q)"/>
 
-  <div class="ver">Kill Switch v2.2</div>
-</div>
+      <g stroke="#1B2537" stroke-width="1">
+        <path d="M158 26V314M246 26V314M418 26V314M506 26V314"/>
+        <path d="M70 74h520M70 122h520M70 218h520M70 266h520"/>
+      </g>
+      <g stroke="#2C3A54" stroke-width="1.2">
+        <path d="M330 26V314M70 170h520"/>
+      </g>
+      <rect x="70.5" y="26.5" width="519" height="287" fill="none" stroke="#22304A"/>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, deleteDoc, writeBatch, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { initializeAppCheck, ReCaptchaV3Provider }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      <g font-family="'JetBrains Mono',monospace" font-size="9.5"
+         letter-spacing="2.2" fill="#4E5C75">
+        <text x="330" y="16" text-anchor="middle">SUBSTANCE +</text>
+        <text x="330" y="332" text-anchor="middle">SUBSTANCE −</text>
+        <text x="60" y="174" text-anchor="end">GOOD FAITH −</text>
+        <text x="600" y="174">GOOD FAITH +</text>
+      </g>
+      <g font-family="'Barlow Condensed',sans-serif" font-size="21" font-weight="600"
+         letter-spacing="3" fill="#243149">
+        <text x="500" y="62">GENUINE</text>
+        <text x="500" y="296" text-anchor="start">SINCERE</text>
+        <text x="112" y="296">TROLL</text>
+        <text x="112" y="62">SHIFTY</text>
+      </g>
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
-  authDomain: "believer-bingo.firebaseapp.com",
-  projectId: "believer-bingo",
-  storageBucket: "believer-bingo.firebasestorage.app",
-  messagingSenderId: "1054324566020",
-  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
-};
+      <g id="visitor">
+        <circle cx="106" cy="286" r="17" fill="#E5484D" opacity=".13"/>
+        <circle cx="106" cy="286" r="7.5" fill="#E5484D"/>
+        <circle cx="106" cy="286" r="2.6" fill="#FFE4E5"/>
+        <path d="M118 279h74" stroke="#E5484D" stroke-width="1.1" opacity=".55"/>
+        <text x="196" y="283" font-family="'JetBrains Mono',monospace" font-size="10.5"
+              letter-spacing="1.6" fill="#E5484D">OUR VISITOR</text>
+      </g>
+    </svg>
 
-const app = initializeApp(firebaseConfig, "kill-switch");
-initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
-  isTokenAutoRefreshEnabled: true
-});
-const db   = getFirestore(app);
-const auth = getAuth(app);
+    <figcaption>
+      <span>Verdict · <b>Troll</b></span>
+      <span>Score · <b>−10.0</b></span>
+      <span>The one rating we kept</span>
+    </figcaption>
+  </figure>
 
-const stateDoc   = doc(db, "vote", "current");
-const votesCol   = collection(db, "vote", "current", "votes");
-const membersRef = doc(db, "config", "innerCircle");
-const namesCol   = collection(db, "memberNames");
+  <div class="rule"></div>
 
-const $ = id => document.getElementById(id);
-const esc = s => { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; };
+  <dl>
+    <dt>What's off</dt>
+    <dd>Believer Bingo, Rate My Caller, the Kill Switch.</dd>
+    <dt>What's on</dt>
+    <dd>Everything that matters. The stream, the callers, the arguments.</dd>
+    <dt>How long</dt>
+    <dd>As long as it takes to do it once, properly.</dd>
+    <dt>To our visitor</dt>
+    <dd>Two minutes drawing on a graph, and you've bought yourself a
+        complete rewrite. Do let us know where to send the invoice.</dd>
+  </dl>
 
-let me = null;
-let myName = null;
-let myVote = null;
-let state = {};
-let tally = { kill: 0, keep: 0, net: 0, killers: [], keepers: [] };
-let votesUnsub = null;
+  <footer>
+    Members, watch this space — you'll hear first.
+    <a href="https://www.youtube.com/@TheUnconvinced">Back to the channel →</a>
+  </footer>
 
-const PLACEHOLDER_CALLER = "Caller Name";
-const hasActiveCaller = s => {
-  const c = ((s && s.caller) || "").trim();
-  return !!c && c !== PLACEHOLDER_CALLER;
-};
-
-function show(step) {
-  $("loadingMsg").style.display = "none";
-  ["stepSignIn", "stepClaim", "stepVote"].forEach(id => {
-    $(id).style.display = (id === step) ? "block" : "none";
-  });
-}
-
-$("btnGoogle").onclick = async () => {
-  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-  catch (e) {
-    console.error(e);
-    if (e.code !== "auth/popup-closed-by-user") {
-      alert("Sign-in failed. Check pop-ups aren't blocked, then try again.");
-    }
-  }
-};
-$("btnSignOut").onclick = () => signOut(auth);
-
-onAuthStateChanged(auth, async user => {
-  // v2.1: an anonymous session is NOT signed in for our purposes. Bingo and
-  // rate.html create one silently on this same domain, and without this check
-  // their visitors would sail straight past Google sign-in.
-  if (user && user.isAnonymous) {
-    try { await signOut(auth); } catch (e) { console.error(e); }
-    me = null; myName = null;
-    show("stepSignIn");
-    return;
-  }
-  me = user;
-  myName = null;
-  if (votesUnsub) { votesUnsub(); votesUnsub = null; }
-  if (!user) { show("stepSignIn"); return; }
-  const acct = user.email || user.displayName || "";
-  document.getElementById("claimAcct").textContent = acct ? "Signed in as " + acct : "";
-  document.getElementById("voteAcct").textContent  = acct;
-
-  try {
-    const snap = await getDocs(namesCol);
-    snap.forEach(d => { if (d.data().uid === user.uid) myName = d.id; });
-  } catch (e) { console.error("[claims] read failed", e); }
-
-  if (myName) {
-    $("whoName").textContent = myName;
-    watchVotes();
-    show("stepVote");
-    render();
-  } else {
-    await fillClaimOptions();
-    show("stepClaim");
-  }
-});
-
-async function fillClaimOptions() {
-  const sel = $("claimSelect");
-  sel.innerHTML = '<option value="">Loading…</option>';
-  try {
-    const [memSnap, nameSnap] = await Promise.all([getDoc(membersRef), getDocs(namesCol)]);
-    const members = memSnap.exists() ? (memSnap.data().members || []) : [];
-    const taken = new Set();
-    nameSnap.forEach(d => taken.add(d.id));
-    const free = members.filter(m => !taken.has(m)).sort((a, b) => a.localeCompare(b));
-    sel.innerHTML = '<option value="">— Select your name —</option>';
-    free.forEach(m => {
-      const o = document.createElement("option");
-      o.value = m; o.textContent = m;
-      sel.appendChild(o);
-    });
-    if (!free.length) sel.innerHTML = '<option value="">No unclaimed names left</option>';
-  } catch (e) {
-    console.error("[claims] options failed", e);
-    sel.innerHTML = '<option value="">Couldn\'t load names</option>';
-  }
-}
-
-$("btnClaim").onclick = async () => {
-  const name = $("claimSelect").value;
-  const box = $("claimStatus");
-  if (!name) { box.className = "status-box err"; box.textContent = "Pick your name first."; return; }
-  $("btnClaim").disabled = true;
-  try {
-    // v2.2: both documents in one batch. The rules use getAfter() to require
-    // the pair, so a client that skips the register entry can no longer claim
-    // a second name.
-    const batch = writeBatch(db);
-    batch.set(doc(namesCol, name), {
-      uid: me.uid, email: me.email || "", claimedAt: serverTimestamp()
-    });
-    batch.set(doc(db, "memberClaims", me.uid), {
-      name, claimedAt: serverTimestamp()
-    });
-    await batch.commit();
-    myName = name;
-    $("whoName").textContent = name;
-    watchVotes();
-    show("stepVote");
-    render();
-  } catch (e) {
-    console.error("[claim] failed", e);
-    box.className = "status-box err";
-    box.textContent = "That name was just claimed by someone else, or you're not allowed to claim it. Refresh and try again, or message Jon.";
-    $("btnClaim").disabled = false;
-    fillClaimOptions();
-  }
-};
-
-onSnapshot(stateDoc, snap => {
-  state = snap.exists() ? snap.data() : {};
-  render();
-}, e => console.error("[state]", e));
-
-function watchVotes() {
-  if (votesUnsub) votesUnsub();
-  votesUnsub = onSnapshot(votesCol, snap => {
-    const killers = [], keepers = [];
-    let mine = null;
-    snap.forEach(d => {
-      const v = d.data();
-      if (v.kind === "kill") killers.push(v.name || "?");
-      else if (v.kind === "keep") keepers.push(v.name || "?");
-      if (me && d.id === me.uid) mine = v.kind || null;
-    });
-    myVote = mine;
-    tally = {
-      kill: killers.length, keep: keepers.length,
-      net: killers.length - keepers.length, killers, keepers
-    };
-    render();
-  }, e => console.error("[votes]", e));
-}
-
-async function castVote(kind) {
-  if (!me || !myName || !hasActiveCaller(state)) return;
-  try {
-    await setDoc(doc(votesCol, me.uid), { name: myName, kind, at: serverTimestamp() });
-  } catch (e) {
-    console.error("[vote] failed", e);
-    const box = $("statusBox");
-    box.className = "status-box err";
-    box.textContent = "Your vote didn't save. If this keeps happening, message Jon.";
-  }
-}
-async function withdrawVote() {
-  if (!me) return;
-  try { await deleteDoc(doc(votesCol, me.uid)); }
-  catch (e) { console.error("[withdraw] failed", e); }
-}
-$("btnKill").onclick = () => castVote("kill");
-$("btnKeep").onclick = () => castVote("keep");
-$("btnWithdraw").onclick = withdrawVote;
-
-function render() {
-  const live = hasActiveCaller(state);
-  const thresh = state.threshold || 2;
-
-  $("callerBar").innerHTML = live
-    ? `<span class="caller-name">📞 ${esc(state.caller)}</span>`
-    : `<span class="caller-name none">— no caller on screen —</span>`;
-
-  if (!me || !myName) return;
-
-  $("lt-kill").textContent = tally.kill;
-  $("lt-keep").textContent = tally.keep;
-  $("lt-net").textContent = tally.net;
-  $("lt-thresh").textContent = thresh;
-  $("liveTally").style.display = (tally.kill || tally.keep) ? "flex" : "none";
-
-  $("hintText").textContent = live
-    ? `Each 🛡 cancels one ☠️. Verdict at net ${thresh}.`
-    : "Voting opens when a caller goes on screen.";
-
-  const bKill = $("btnKill"), bKeep = $("btnKeep"), bWith = $("btnWithdraw"), box = $("statusBox");
-  [bKill, bKeep].forEach(b => { b.classList.remove("active", "idle"); b.disabled = false; });
-
-  if (live && tally.net >= thresh) {
-    box.className = "status-box fired";
-    box.innerHTML = "☠️ KILL SWITCH ACTIVATED<br><small>Killers: " + tally.killers.map(esc).join(", ") + "</small>"
-      + (tally.keepers.length ? "<br><small style='opacity:.7'>Shielded in vain: " + tally.keepers.map(esc).join(", ") + "</small>" : "");
-    bKill.disabled = true; bKeep.disabled = true;
-    bWith.style.display = myVote ? "block" : "none";
-    return;
-  }
-
-  if (!live) {
-    bKill.disabled = true; bKeep.disabled = true;
-    bKill.classList.add("idle"); bKeep.classList.add("idle");
-    bWith.style.display = "none";
-    box.className = "status-box waiting";
-    box.textContent = "⏳ Waiting for a caller to go on screen.";
-    return;
-  }
-
-  if (myVote === "kill") {
-    bKill.classList.add("active"); bKill.disabled = true;
-    box.className = "status-box kill-voted";
-    box.textContent = "☠️ KILL vote cast. Tap SHIELD to switch, or withdraw.";
-    bWith.style.display = "block";
-  } else if (myVote === "keep") {
-    bKeep.classList.add("active"); bKeep.disabled = true;
-    box.className = "status-box keep-voted";
-    box.textContent = "🛡 SHIELD vote cast. Tap KILL to switch, or withdraw.";
-    bWith.style.display = "block";
-  } else {
-    box.className = "status-box"; box.style.display = "none";
-    bWith.style.display = "none";
-  }
-}
-</script>
+</main>
 </body>
 </html>

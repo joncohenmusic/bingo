@@ -1,358 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Believer Bingo v2.2 – The Unconvinced</title>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Tools — Offline · The Unconvinced (v1.0)</title>
+<meta name="robots" content="noindex">
+<!--
+  ════════════════════════════════════════════════════════════════
+  THE UNCONVINCED — interactive tools holding page      v1.0
+  18–20 Aug 2026
+
+  Deploy as rate.html, viewer.html and vote.html (three copies of
+  this same file) so every existing link and QR code lands here.
+
+  Contains NO Firebase SDK and makes no network calls beyond the
+  webfont. It cannot read or write the database, so it costs
+  nothing to serve however many people load it.
+
+  CHANGELOG
+  v1.0  First build. Static page, no scripts touching Firestore.
+  ════════════════════════════════════════════════════════════════
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a1a;--cell-bg:#1a1a3e;--cell-hover:#252560;--neon-pink:#ff2d55;--neon-blue:#00d4ff;--neon-green:#39ff14;--neon-yellow:#ffe600;--neon-purple:#bf5fff;--text:#f0f0ff;--text-dim:#8888aa;--gold:#ffd700;}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);font-family:'Lexend',sans-serif;color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px;}
-.scanline-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:100;}
-.vignette{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5) 100%);pointer-events:none;z-index:99;}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:300;}
-.modal-overlay.hidden{display:none;}
-.modal{background:linear-gradient(135deg,#1a1a3e,#0d0d2b);border:2px solid rgba(0,212,255,.4);border-radius:20px;padding:40px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;box-shadow:0 0 40px rgba(0,212,255,.15);width:min(90vw,360px);}
-.modal-title{font-family:'Bangers',cursive;font-size:36px;letter-spacing:4px;background:linear-gradient(135deg,var(--neon-pink),var(--neon-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.modal-sub{color:var(--text-dim);font-size:13px;text-align:center;line-height:1.6;}
-.modal input{width:100%;background:rgba(255,255,255,.07);border:2px solid rgba(0,212,255,.3);border-radius:10px;color:var(--text);font-family:'Lexend',sans-serif;font-size:16px;padding:12px 16px;outline:none;text-align:center;transition:border-color .2s;}
-.modal input:focus{border-color:var(--neon-blue);}
-.modal input::placeholder{color:var(--text-dim);}
-.modal button{width:100%;background:linear-gradient(135deg,var(--neon-pink),#cc1144);border:none;border-radius:10px;color:#fff;font-family:'Lexend',sans-serif;font-weight:700;font-size:15px;padding:14px;cursor:pointer;letter-spacing:1px;box-shadow:0 0 20px rgba(255,45,85,.4);transition:all .2s;}
-.modal button:hover{box-shadow:0 0 30px rgba(255,45,85,.6);transform:translateY(-1px);}
-.wrapper{width:min(98vw,460px);display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10;}
-.title{font-family:'Bangers',cursive;font-size:clamp(42px,10vw,68px);letter-spacing:6px;text-transform:uppercase;background:linear-gradient(135deg,var(--neon-pink),var(--neon-blue),var(--neon-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(255,45,85,.5)) drop-shadow(0 0 40px rgba(0,212,255,.3));animation:titlePulse 3s ease-in-out infinite;line-height:1;text-align:center;}
-@keyframes titlePulse{0%,100%{filter:drop-shadow(0 0 20px rgba(255,45,85,.5)) drop-shadow(0 0 40px rgba(0,212,255,.3));}50%{filter:drop-shadow(0 0 30px rgba(255,45,85,.7)) drop-shadow(0 0 60px rgba(0,212,255,.5));}}
-.subtitle{font-size:12px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;text-align:center;line-height:1.6;}
-.score-bar{display:flex;gap:24px;align-items:center;justify-content:center;}
-.score-item{font-size:14px;font-weight:600;color:var(--text-dim);}
-.score-item span{color:var(--neon-blue);font-size:20px;font-family:'Bangers',cursive;letter-spacing:2px;}
-.bingo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;width:100%;background:linear-gradient(135deg,rgba(255,45,85,.08),rgba(0,212,255,.08));border:2px solid rgba(255,45,85,.3);border-radius:18px;box-shadow:0 0 30px rgba(255,45,85,.12),0 0 60px rgba(0,212,255,.08),inset 0 0 30px rgba(0,0,0,.3);}
-.cell{aspect-ratio:4/3;background:var(--cell-bg);border:1px solid rgba(255,255,255,.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px 6px;cursor:pointer;transition:all .2s ease;position:relative;overflow:hidden;user-select:none;}
-.cell-text{font-size:clamp(9px,2.3vw,15px);font-weight:600;line-height:1.2;color:var(--text);overflow-wrap:anywhere;hyphens:auto;}
-.cell-caller{font-size:clamp(9px,1.9vw,13px);color:var(--neon-yellow);margin-top:3px;font-weight:700;letter-spacing:.3px;overflow-wrap:anywhere;}
-.cell-pending-label{font-size:clamp(8px,1.7vw,12px);color:var(--neon-yellow);margin-top:2px;opacity:.85;}
-.cell:hover:not(.marked):not(.pending):not(.free-space){background:var(--cell-hover);border-color:rgba(0,212,255,.3);transform:scale(1.03);box-shadow:0 0 15px rgba(0,212,255,.2);}
-.cell.marked{background:linear-gradient(135deg,var(--neon-pink),#cc1144);border-color:var(--neon-pink);box-shadow:0 0 20px rgba(255,45,85,.5),0 0 40px rgba(255,45,85,.2),inset 0 0 15px rgba(255,255,255,.1);animation:markPop .4s cubic-bezier(.175,.885,.32,1.275);cursor:default;}
-.cell.marked .cell-text{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);}
-.cell.marked::after{content:'✓';position:absolute;top:5px;right:7px;font-size:14px;opacity:.8;}
-@keyframes markPop{0%{transform:scale(.8)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
-.cell.pending{border-color:rgba(255,230,0,.7);cursor:default;animation:pendingPulse 1.5s ease-in-out infinite;}
-.cell.pending.mine{cursor:pointer;}
-.cell.pending.mine:hover{box-shadow:0 0 22px rgba(255,230,0,.55),0 0 42px rgba(255,45,85,.22);}
-@keyframes pendingPulse{0%,100%{box-shadow:0 0 8px rgba(255,230,0,.2);border-color:rgba(255,230,0,.5);}50%{box-shadow:0 0 20px rgba(255,230,0,.5),0 0 35px rgba(255,230,0,.2);border-color:rgba(255,230,0,.9);}}
-.cell.free-space{background:linear-gradient(135deg,#2a1a0a,#3d1a00);border-color:rgba(255,100,0,.4);cursor:default;}
-.cell.free-space .cell-text{font-family:'Bangers',cursive;font-size:clamp(11px,2.6vw,18px);letter-spacing:1px;color:#ff6600;text-shadow:0 0 10px rgba(255,100,0,.5);}
-.cell.win-highlight{animation:winPulse .6s ease infinite alternate;box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3),inset 0 0 15px rgba(255,215,0,.2);border-color:var(--gold)!important;}
-@keyframes winPulse{from{box-shadow:0 0 25px rgba(255,215,0,.6),0 0 50px rgba(255,215,0,.3);}to{box-shadow:0 0 35px rgba(255,215,0,.8),0 0 70px rgba(255,215,0,.5);}}
-.status-msg{font-size:12px;color:var(--neon-green);text-align:center;min-height:18px;transition:opacity .5s;letter-spacing:1px;}
-.hint{color:var(--text-dim);font-size:11px;text-align:center;line-height:1.6;}
-.channel-link{font-size:11px;color:var(--text-dim);text-align:center;}
-.channel-link a{color:var(--neon-blue);text-decoration:none;}
-.waiting-msg{grid-column:1/-1;color:var(--text-dim);text-align:center;padding:40px 20px;font-size:14px;line-height:2;}
+  :root{
+    --ink:#0A0E17;
+    --panel:#111827;
+    --line:#1F2A3E;
+    --gold:#E8A33D;
+    --gold-dim:#8A6524;
+    --bone:#D6DEEC;
+    --muted:#6B7A94;
+    --troll:#E5484D;
+    --disp:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink);color:var(--bone)}
+  body{
+    font-family:var(--mono);font-size:14px;line-height:1.65;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:40px 22px;
+    background-image:radial-gradient(ellipse 80% 55% at 50% 0%,#131C2E 0%,var(--ink) 70%);
+  }
+  .card{width:100%;max-width:660px}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 14px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;background:var(--troll);
+    box-shadow:0 0 0 3px rgba(229,72,77,.16);
+    animation:breathe 2.6s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+  h1{
+    font-family:var(--disp);font-weight:700;
+    font-size:clamp(42px,10vw,76px);line-height:.93;letter-spacing:.005em;
+    text-transform:uppercase;margin:0 0 20px;color:#F1F5FC;
+  }
+  h1 em{font-style:normal;color:var(--gold);display:block}
+
+  .lede{font-size:14.5px;color:#AEBACE;max-width:52ch;margin:0 0 34px}
+  .lede strong{color:var(--bone);font-weight:500}
+
+  /* ── signature: the matrix, turned on the visitor ── */
+  figure{margin:0 0 34px;border:1px solid var(--line);border-radius:4px;
+     background:var(--panel);overflow:hidden}
+  .figtop{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:13px 16px;border-bottom:1px solid var(--line);
+  }
+  .figtop span:first-child{
+    font-family:var(--disp);font-size:17px;font-weight:600;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--gold);
+  }
+  .figtop span:last-child{font-size:10px;letter-spacing:.16em;
+     text-transform:uppercase;color:var(--muted)}
+  svg{display:block;width:100%;height:auto}
+  figcaption{
+    display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:12px 16px;border-top:1px solid var(--line);
+    font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+  }
+  figcaption b{color:var(--troll);font-weight:500;letter-spacing:.15em}
+
+  .rule{height:1px;background:var(--line);margin:0 0 26px}
+
+  dl{margin:0 0 30px;display:grid;grid-template-columns:auto 1fr;gap:9px 20px;
+     font-size:12.5px}
+  dt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+     color:var(--muted);padding-top:3px}
+  dd{margin:0;color:#AEBACE}
+
+  footer{font-size:12px;color:var(--muted)}
+  footer a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--gold-dim);
+     padding-bottom:1px}
+  footer a:hover{border-bottom-color:var(--gold)}
+  footer a:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:2px}
+
+  @media(prefers-reduced-motion:reduce){
+    .dot{animation:none}
+    #visitor{animation:none}
+  }
+  #visitor{animation:settle 1.1s cubic-bezier(.22,1,.36,1) both}
+  @keyframes settle{
+    from{transform:translate(120px,-90px);opacity:0}
+    to{transform:translate(0,0);opacity:1}
+  }
 </style>
 </head>
 <body>
-<div class="scanline-overlay"></div>
-<div class="vignette"></div>
+<main class="card">
 
-<div class="modal-overlay" id="usernameModal">
-  <div class="modal">
-    <div class="modal-title">Who Are You?</div>
-    <div class="modal-sub">Enter your YouTube username to play along.<br>Your name appears on every square you call! 🎯</div>
-    <input type="text" id="usernameInput" placeholder="YourUsername" maxlength="30" autofocus>
-    <button id="joinBtn">Let's Play!</button>
-  </div>
-</div>
+  <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Interactive tools · offline</p>
 
-<div class="wrapper">
-  <div class="title">Believer Bingo</div>
-  <div class="subtitle">The Unconvinced Livestream</div>
-  <div class="score-bar">
-    <div class="score-item">Marked: <span id="markedCount">0</span></div>
-    <div class="score-item">Lines: <span id="lineCount">0</span></div>
-  </div>
-  <div class="bingo-grid" id="bingoGrid">
-    <div class="waiting-msg">⏳ Waiting for the stream to start...</div>
-  </div>
-  <div class="status-msg" id="statusMsg"></div>
-  <div class="hint">Tap a square when you hear it — Jon approves live! 🎙️</div>
-  <div class="channel-link">Watch live at <a href="https://youtube.com/@joncohenofficial" target="_blank">Jon Cohen – The Unconvinced</a></div>
-</div>
+  <h1>Back when<em>they're built</em></h1>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  <p class="lede">Believer Bingo, Rate My Caller and the Kill Switch are switched
+    off while the whole thing is rebuilt from the ground up. <strong>They will
+    be back.</strong> Properly this time, rather than patched between streams.</p>
 
+  <figure>
+    <div class="figtop">
+      <span>Rate This Caller</span>
+      <span>Final session · 1 voter</span>
+    </div>
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCvclsCp83qcaTVTYe1GTT0ZIhIbMCut14",
-  authDomain: "believer-bingo.firebaseapp.com",
-  projectId: "believer-bingo",
-  storageBucket: "believer-bingo.firebasestorage.app",
-  messagingSenderId: "1054324566020",
-  appId: "1:1054324566020:web:dc6739c69458011efe2d51"
-};
+    <svg viewBox="0 0 660 340" role="img"
+         aria-label="Rating matrix with a single dot placed at the extreme troll, no-substance corner, labelled our visitor.">
+      <defs>
+        <linearGradient id="q" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#1A2438"/>
+          <stop offset="100%" stop-color="#131B2B"/>
+        </linearGradient>
+      </defs>
+      <rect x="70" y="26" width="520" height="288" fill="url(#q)"/>
 
-// v2.0: AUTO_APPROVE removed. Marking a square directly is now impossible
-// from this page — every call goes to the pending queue for Jon to approve.
-const app = initializeApp(firebaseConfig);
-// ── Security layer (v2.2) ───────────────────────────────────────────────
-// v2.2: replaces v2.1's one-call-per-account limit, which was too blunt —
-// good players legitimately call several squares during one caller.
-//
-// A pending call now lives at pending/{uid}_{cellIndex}, so you can hold as
-// many calls as there are squares, but only ever one per square. Flooding is
-// stopped by TIME instead: each call also stamps callers/{uid}.lastCallAt in
-// the same batched write, and the rules refuse any call arriving less than
-// MIN_CALL_GAP_MS after the previous one from that account.
-initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LcvNIctAAAAAOjTkgggP16cTBL9kK44EN5awVdq"),
-  isTokenAutoRefreshEnabled: true
-});
-const auth = getAuth(app);
-let myUid = null;
-const authReady = new Promise((resolve, reject) => {
-  onAuthStateChanged(auth, u => { if (u) { myUid = u.uid; resolve(u); } });
-  signInAnonymously(auth).catch(err => { console.error("[auth] sign-in failed", err); reject(err); });
-});
+      <g stroke="#1B2537" stroke-width="1">
+        <path d="M158 26V314M246 26V314M418 26V314M506 26V314"/>
+        <path d="M70 74h520M70 122h520M70 218h520M70 266h520"/>
+      </g>
+      <g stroke="#2C3A54" stroke-width="1.2">
+        <path d="M330 26V314M70 170h520"/>
+      </g>
+      <rect x="70.5" y="26.5" width="519" height="287" fill="none" stroke="#22304A"/>
 
-const db  = getFirestore(app);
+      <g font-family="'JetBrains Mono',monospace" font-size="9.5"
+         letter-spacing="2.2" fill="#4E5C75">
+        <text x="330" y="16" text-anchor="middle">SUBSTANCE +</text>
+        <text x="330" y="332" text-anchor="middle">SUBSTANCE −</text>
+        <text x="60" y="174" text-anchor="end">GOOD FAITH −</text>
+        <text x="600" y="174">GOOD FAITH +</text>
+      </g>
+      <g font-family="'Barlow Condensed',sans-serif" font-size="21" font-weight="600"
+         letter-spacing="3" fill="#243149">
+        <text x="500" y="62">GENUINE</text>
+        <text x="500" y="296" text-anchor="start">SINCERE</text>
+        <text x="112" y="296">TROLL</text>
+        <text x="112" y="62">SHIFTY</text>
+      </g>
 
-// v2.2: must match duration.value(3,'s') in the Firestore rules. The client
-// guard is slightly longer so a legitimate player gets a friendly message
-// instead of a permission error. Change one, change the other.
-const MIN_CALL_GAP_MS = 3000;
-const CALL_GUARD_MS   = 3200;
-let lastCallAt = 0;
+      <g id="visitor">
+        <circle cx="106" cy="286" r="17" fill="#E5484D" opacity=".13"/>
+        <circle cx="106" cy="286" r="7.5" fill="#E5484D"/>
+        <circle cx="106" cy="286" r="2.6" fill="#FFE4E5"/>
+        <path d="M118 279h74" stroke="#E5484D" stroke-width="1.1" opacity=".55"/>
+        <text x="196" y="283" font-family="'JetBrains Mono',monospace" font-size="10.5"
+              letter-spacing="1.6" fill="#E5484D">OUR VISITOR</text>
+      </g>
+    </svg>
 
-let username = "", boardSquares = [], markedCells = {}, pendingCells = {};
-let detectedLines = new Set(), initialLoad = true;
-let currentCaller = "";  // active caller from rateThisCaller/state, captured on each pending submission
-// Shape state — defaults to legacy 3x4 with FREE at index 4
-let boardCols = 3, boardRows = 4, boardFreeIdx = 4;
+    <figcaption>
+      <span>Verdict · <b>Troll</b></span>
+      <span>Score · <b>−10.0</b></span>
+      <span>The one rating we kept</span>
+    </figcaption>
+  </figure>
 
-function defaultFreeIndex(cols, rows){
-  // Preserve original 3x4 layout (FREE at index 4) so legacy boards stay correct
-  if (cols===3 && rows===4) return 4;
-  return Math.floor(rows/2)*cols + Math.floor(cols/2);
-}
+  <div class="rule"></div>
 
-function computeWinLines(cols, rows, freeIdx) {
-  if (cols===3 && rows===3) return [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  if (cols===3 && rows===4) return [[0,1,2],[3,4,5],[6,7,8],[9,10,11],[0,3,6,9],[1,4,7,10],[2,5,8,11],[0,4,8],[2,4,6],[3,7,11],[1,5,9]];
-  const lines=[];
-  for (let r=0;r<rows;r++){ const ln=[]; for(let c=0;c<cols;c++) ln.push(r*cols+c); lines.push(ln); }
-  for (let c=0;c<cols;c++){ const ln=[]; for(let r=0;r<rows;r++) ln.push(r*cols+c); lines.push(ln); }
-  if (cols===rows){
-    const d1=[],d2=[]; for(let i=0;i<cols;i++){ d1.push(i*cols+i); d2.push(i*cols+(cols-1-i)); }
-    lines.push(d1,d2);
-  }
-  return lines;
-}
+  <dl>
+    <dt>What's off</dt>
+    <dd>Believer Bingo, Rate My Caller, the Kill Switch.</dd>
+    <dt>What's on</dt>
+    <dd>Everything that matters. The stream, the callers, the arguments.</dd>
+    <dt>How long</dt>
+    <dd>As long as it takes to do it once, properly.</dd>
+    <dt>To our visitor</dt>
+    <dd>Two minutes drawing on a graph, and you've bought yourself a
+        complete rewrite. Do let us know where to send the invoice.</dd>
+  </dl>
 
-function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  <footer>
+    Members, watch this space — you'll hear first.
+    <a href="https://www.youtube.com/@TheUnconvinced">Back to the channel →</a>
+  </footer>
 
-// Backward-compat: markedCells values may be strings (legacy) or {username, caller} (new)
-function getMarkedUser(v) {
-  if (!v) return null;
-  return (typeof v === "string") ? v : (v.username || null);
-}
-
-// Username modal
-document.getElementById('joinBtn').addEventListener('click', joinGame);
-document.getElementById('usernameInput').addEventListener('keydown', function(e){ if(e.key==='Enter') joinGame(); });
-function joinGame() {
-  const val = document.getElementById('usernameInput').value.trim();
-  if (!val) return;
-  username = val;
-  document.getElementById('usernameDisplay') && (document.getElementById('usernameDisplay').textContent = val);
-  document.getElementById('usernameModal').classList.add('hidden');
-  startListening();
-}
-
-function startListening() {
-  // Track the active rate-this-caller session so we can stamp it on bingo claims
-  onSnapshot(doc(db,'rateThisCaller','state'), function(snap) {
-    currentCaller = snap.exists() ? (snap.data().callerName || "") : "";
-  });
-  onSnapshot(doc(db,'games','current'), function(snap) {
-    const prev = Object.assign({}, markedCells);
-    boardSquares = snap.exists() ? (snap.data().squares||[]) : [];
-    markedCells  = snap.exists() ? (snap.data().markedCells||{}) : {};
-    // Shape: prefer explicit doc fields, else infer from square count for legacy boards
-    const data = snap.exists() ? snap.data() : {};
-    if (data.cols && data.rows) {
-      boardCols = data.cols; boardRows = data.rows;
-    } else {
-      const total = boardSquares.length + 1;
-      if (total === 9)       { boardCols=3; boardRows=3; }
-      else if (total === 12) { boardCols=3; boardRows=4; }
-      else                   { boardCols=3; boardRows=Math.ceil(total/3); }
-    }
-    boardFreeIdx = (typeof data.freeIndex === 'number') ? data.freeIndex : defaultFreeIndex(boardCols, boardRows);
-    if (!initialLoad) checkBingo(prev);
-    buildBoard();
-  });
-  onSnapshot(collection(db,'games','current','pending'), function(snap) {
-    pendingCells = {};
-    snap.forEach(function(d){ pendingCells[d.data().cellIndex] = { id: d.id, username: d.data().username || '', uid: d.data().uid || '' }; });
-    initialLoad = false;
-    buildBoard();
-  });
-}
-
-function buildBoard() {
-  const grid = document.getElementById('bingoGrid');
-  grid.innerHTML = '';
-  if (!boardSquares.length) {
-    grid.style.gridTemplateColumns = 'repeat(3,1fr)';
-    grid.style.gridTemplateRows = '';
-    grid.innerHTML = '<div class="waiting-msg">⏳ Waiting for the stream to start...</div>';
-    updateScore(); return;
-  }
-  const cols=boardCols, rows=boardRows, FREE=boardFreeIdx;
-  const TOTAL = cols*rows;
-  const WIN = computeWinLines(cols, rows, FREE);
-  grid.style.gridTemplateColumns = 'repeat('+cols+',1fr)';
-  grid.style.gridTemplateRows = 'repeat('+rows+',1fr)';
-  for (let i=0; i<TOTAL; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    const isFree=(i===FREE), markedEntry=markedCells[String(i)], isPend=pendingCells[i]!==undefined;
-    const caller=getMarkedUser(markedEntry);
-    const text = isFree ? '🔥 CRASH OUT 🔥' : (boardSquares[i>FREE?i-1:i]||'?');
-    if (isFree) cell.classList.add('free-space');
-    if (caller) {
-      cell.classList.add('marked');
-      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-caller">@'+esc(caller.replace(/^@/,''))+'</span>';
-    } else if (isPend) {
-      cell.classList.add('pending');
-      // v2.0: "mine" is now the Firebase identity, not a typed name, so you
-      // can no longer cancel someone else's call by copying their username.
-      const mine = !!myUid && pendingCells[i].uid === myUid;
-      if (mine) {
-        cell.classList.add('mine');
-        cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting — tap to cancel</span>';
-        cell.addEventListener('click', (function(idx){return function(){withdrawCell(idx);};})(i));
-      } else {
-        cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span><span class="cell-pending-label">⏳ awaiting approval</span>';
-      }
-    } else {
-      cell.innerHTML = '<span class="cell-text">'+esc(text)+'</span>';
-      cell.addEventListener('click', (function(idx,t){return function(){submitCell(idx,t);};})(i,text));
-    }
-    detectedLines.forEach(function(k){ if(WIN[+k]&&WIN[+k].includes(i)) cell.classList.add('win-highlight'); });
-    grid.appendChild(cell);
-  }
-  updateScore();
-  requestAnimationFrame(fitCellText);
-}
-
-async function submitCell(gridIndex, text) {
-  if (!username || markedCells[String(gridIndex)] || pendingCells[gridIndex]!==undefined) return;
-  await authReady;
-  if (!myUid) { showStatus('⚠️ Not connected yet — try again'); return; }
-
-  // v2.2: soft client-side pacing, so the usual case is a friendly message
-  // rather than a rejected write. The rules are the real enforcement.
-  const wait = CALL_GUARD_MS - (Date.now() - lastCallAt);
-  if (wait > 0) {
-    showStatus('⏳ One at a time — try again in ' + Math.ceil(wait/1000) + 's');
-    return;
-  }
-
-  try {
-    // v2.2: id is account + square, so you can call several squares but never
-    // the same square twice. The stopwatch write goes in the same batch — if
-    // the rules refuse it for being too soon, the call is refused with it.
-    const callId = myUid + '_' + gridIndex;
-    const batch = writeBatch(db);
-    batch.set(doc(db,'games','current','pending', callId), {
-      cellIndex: gridIndex, username, squareText: text,
-      caller: currentCaller || null,
-      uid: myUid,
-      submittedAt: serverTimestamp()
-    });
-    batch.set(doc(db,'callers', myUid), { lastCallAt: serverTimestamp() });
-    await batch.commit();
-    lastCallAt = Date.now();
-    showStatus('"'+text.replace(/\n/g,' ')+'" called — waiting for Jon! 👀');
-  } catch(e) {
-    if (e && e.code === 'permission-denied') {
-      showStatus('⏳ Slow down a moment, then try again');
-    } else {
-      showStatus('⚠️ Connection error — try again');
-    }
-  }
-}
-
-async function withdrawCell(gridIndex) {
-  const pend = pendingCells[gridIndex];
-  if (!pend || !myUid || pend.uid !== myUid) return;
-  try {
-    // v2.2: the document id is account + square.
-    await deleteDoc(doc(db,'games','current','pending', myUid + '_' + gridIndex));
-    showStatus('Call withdrawn ↩');
-  } catch(e) { showStatus('⚠️ Couldn\'t withdraw — try again'); }
-}
-
-// Auto-shrink each cell's text until it fits, so long labels never clip on a 5x5 board
-function fitCellText(){
-  document.querySelectorAll(".cell").forEach(function(cell){
-    const txt=cell.querySelector(".cell-text"); if(!txt) return;
-    const extras=cell.querySelectorAll(".cell-caller,.cell-pend-label,.cell-pending-label");
-    txt.style.fontSize=""; extras.forEach(function(e){e.style.fontSize="";});
-    const cs=getComputedStyle(cell);
-    const availH=cell.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
-    const availW=cell.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
-    if(!(availH>0)||!(availW>0)) return;
-    function contentH(){let h=0;cell.querySelectorAll(":scope > *").forEach(function(el){h+=el.getBoundingClientRect().height;});return h;}
-    function tooWide(el){return el.scrollWidth>Math.ceil(availW)+1;}
-    // Shrink the square text until it fits both vertically and horizontally
-    let size=parseFloat(getComputedStyle(txt).fontSize),guard=90;
-    while(guard-->0 && size>6 && (contentH()>availH || tooWide(txt))){size-=0.5;txt.style.fontSize=size+"px";}
-    // Then shrink caller/pending lines if they still push it over
-    guard=60;
-    while(guard-->0 && extras.length){
-      let over=contentH()>availH;
-      extras.forEach(function(e){ if(tooWide(e)) over=true; });
-      if(!over) break;
-      let shrunk=false;
-      extras.forEach(function(e){let v=parseFloat(getComputedStyle(e).fontSize);if(v>6){e.style.fontSize=(v-0.5)+"px";shrunk=true;}});
-      if(!shrunk) break;
-    }
-  });
-}
-let _fitRaf;
-window.addEventListener('resize', function(){ cancelAnimationFrame(_fitRaf); _fitRaf = requestAnimationFrame(fitCellText); });
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ requestAnimationFrame(fitCellText); });
-
-function showStatus(msg) {
-  const el = document.getElementById('statusMsg');
-  el.textContent = msg; el.style.opacity = '1';
-  setTimeout(function(){ el.style.opacity = '0'; }, 3500);
-}
-
-function updateScore() {
-  document.getElementById('markedCount').textContent = Object.keys(markedCells).length;
-  document.getElementById('lineCount').textContent = detectedLines.size;
-}
-
-function checkBingo(prev) {
-  const FREE=boardFreeIdx, WIN=computeWinLines(boardCols, boardRows, FREE);
-  WIN.forEach(function(line,idx){
-    const k=String(idx);
-    if (!detectedLines.has(k) && line.every(function(i){return i===FREE||markedCells[String(i)];})){
-      detectedLines.add(k);
-    }
-  });
-  updateScore();
-}
-</script>
+</main>
 </body>
 </html>
